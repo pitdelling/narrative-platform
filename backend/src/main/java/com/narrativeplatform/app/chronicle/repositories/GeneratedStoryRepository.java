@@ -1,0 +1,10 @@
+package com.narrativeplatform.app.chronicle.repositories;
+
+import com.narrativeplatform.app.chronicle.models.entities.GeneratedStoryEntity;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.UUID;
+
+public interface GeneratedStoryRepository extends JpaRepository<GeneratedStoryEntity, UUID> {
+    long countByChronicleId(UUID chronicleId);
+}
