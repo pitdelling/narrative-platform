@@ -69,8 +69,13 @@ public class PartyInvitationLinkEntity {
             final String tokenHash,
             final UserEntity createdBy
     ) {
+        // Do not set `partyId` explicitly here: Spring Data JPA's save() decides persist vs.
+        // merge based on whether the id is already non-null. Presetting it makes save() treat a
+        // brand-new entity as a detached one and call merge(), which crashes on this @MapsId
+        // one-to-one with a Hibernate "null identifier" AssertionFailure. Leaving it null lets
+        // save() correctly call persist(), and Hibernate derives partyId from `party` at flush
+        // time (same convention as GameDraftEntity/WrittenStoryDocumentEntity).
         this.party = party;
-        this.partyId = party.getId(); // set explicitly rather than relying on @MapsId sync timing
         this.token = token;
         this.tokenHash = tokenHash;
         this.createdBy = createdBy;

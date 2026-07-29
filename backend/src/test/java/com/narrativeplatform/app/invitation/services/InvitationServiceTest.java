@@ -100,6 +100,18 @@ class InvitationServiceTest {
         return new PartyMemberEntity(party, user, role, status);
     }
 
+    /**
+     * The production constructor deliberately leaves {@code partyId} null so Spring Data JPA's
+     * save() calls persist() instead of merge() (see {@link PartyInvitationLinkEntity}'s
+     * Javadoc) — Hibernate only fills it in via @MapsId once a real EntityManager persists the
+     * row, which never happens in this pure-Mockito test. Set it explicitly here instead.
+     */
+    private PartyInvitationLinkEntity link(final String rawToken, final UserEntity actor) {
+        final var entity = new PartyInvitationLinkEntity(party, rawToken, TokenUtils.sha256(rawToken), actor);
+        entity.setPartyId(party.getId());
+        return entity;
+    }
+
     private void currentUserIs(final UserEntity user) {
         when(currentUserService.require()).thenReturn(new AuthenticatedUser(user.getId(), user.getUsername()));
     }
@@ -110,7 +122,7 @@ class InvitationServiceTest {
         currentUserIs(owner);
         final var membership = membership(owner, PartyRoleType.NARRATOR, MemberStatusType.ACTIVE);
         when(memberRepository.findByPartyIdAndUserId(partyId, owner.getId())).thenReturn(Optional.of(membership));
-        final var link = new PartyInvitationLinkEntity(party, "raw-token", TokenUtils.sha256("raw-token"), owner);
+        final var link = link("raw-token", owner);
         when(linkRepository.findById(partyId)).thenReturn(Optional.of(link));
 
         final var response = invitationService.getCurrentLink(partyId);
@@ -135,7 +147,7 @@ class InvitationServiceTest {
         currentUserIs(owner);
         final var membership = membership(owner, PartyRoleType.NARRATOR, MemberStatusType.ACTIVE);
         when(memberRepository.findByPartyIdAndUserId(partyId, owner.getId())).thenReturn(Optional.of(membership));
-        final var link = new PartyInvitationLinkEntity(party, "old-token", TokenUtils.sha256("old-token"), owner);
+        final var link = link("old-token", owner);
         when(linkRepository.findForUpdateById(partyId)).thenReturn(Optional.of(link));
 
         invitationService.regenerateLink(partyId);
@@ -148,7 +160,7 @@ class InvitationServiceTest {
         currentUserIs(owner);
         final var membership = membership(owner, PartyRoleType.OWNER, MemberStatusType.ACTIVE);
         when(memberRepository.findByPartyIdAndUserId(partyId, owner.getId())).thenReturn(Optional.of(membership));
-        final var link = new PartyInvitationLinkEntity(party, "old-token", TokenUtils.sha256("old-token"), owner);
+        final var link = link("old-token", owner);
         when(linkRepository.findForUpdateById(partyId)).thenReturn(Optional.of(link));
 
         assertDoesNotThrow(() -> invitationService.regenerateLink(partyId));
@@ -193,7 +205,7 @@ class InvitationServiceTest {
         when(memberRepository.findByPartyIdAndUserId(partyId, owner.getId())).thenReturn(Optional.of(membership));
         final var oldRawToken = "old-raw-token";
         final var oldHash = TokenUtils.sha256(oldRawToken);
-        final var link = new PartyInvitationLinkEntity(party, oldRawToken, oldHash, owner);
+        final var link = link(oldRawToken, owner);
         when(linkRepository.findForUpdateById(partyId)).thenReturn(Optional.of(link));
 
         invitationService.regenerateLink(partyId);
@@ -208,7 +220,7 @@ class InvitationServiceTest {
     @Test
     void newLinkWorksMoreThanOnce() {
         final var rawToken = "reusable-token";
-        final var link = new PartyInvitationLinkEntity(party, rawToken, TokenUtils.sha256(rawToken), owner);
+        final var link = link(rawToken, owner);
         when(linkRepository.findByTokenHash(TokenUtils.sha256(rawToken))).thenReturn(Optional.of(link));
 
         final var userA = user("alice", "Alice");
@@ -231,7 +243,7 @@ class InvitationServiceTest {
     @Test
     void duplicateAcceptanceIsIdempotent() {
         final var rawToken = "reusable-token";
-        final var link = new PartyInvitationLinkEntity(party, rawToken, TokenUtils.sha256(rawToken), owner);
+        final var link = link(rawToken, owner);
         when(linkRepository.findByTokenHash(TokenUtils.sha256(rawToken))).thenReturn(Optional.of(link));
 
         final var newcomer = user("newcomer", "Newcomer");
@@ -254,7 +266,7 @@ class InvitationServiceTest {
         final var membership = membership(owner, PartyRoleType.NARRATOR, MemberStatusType.ACTIVE);
         when(memberRepository.findByPartyIdAndUserId(partyId, owner.getId())).thenReturn(Optional.of(membership));
 
-        final var wonTheRace = new PartyInvitationLinkEntity(party, "concurrent-token", TokenUtils.sha256("concurrent-token"), owner);
+        final var wonTheRace = link("concurrent-token", owner);
         when(linkRepository.findForUpdateById(partyId))
                 .thenReturn(Optional.empty(), Optional.of(wonTheRace));
         when(linkRepository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("duplicate key"));
