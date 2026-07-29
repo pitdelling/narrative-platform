@@ -40,7 +40,7 @@ export default function HomePage() {
       </section>
       <section className="auth-panel card">
         <p className="eyebrow">Arquivo do Cronista</p>
-        <h2>{mode === "login" ? "Entrar" : "Criar conta de narrador"}</h2>
+        <h2>{mode === "login" ? "Entrar" : "Crie sua conta"}</h2>
         <form onSubmit={submit}>
           <label>Usuário<input value={username} onChange={(e) => setUsername(e.target.value)} required /></label>
           {mode === "register" && <label>Nome de exibição<input value={displayName} onChange={(e) => setDisplayName(e.target.value)} required /></label>}
@@ -49,7 +49,7 @@ export default function HomePage() {
           <button className="button primary" disabled={loading}>{loading ? "Aguarde..." : mode === "login" ? "Entrar" : "Criar conta"}</button>
         </form>
         <button className="text-button" onClick={() => setMode(mode === "login" ? "register" : "login")}>
-          {mode === "login" ? "Quero criar uma conta de narrador" : "Já tenho uma conta"}
+          {mode === "login" ? "Quero criar uma conta" : "Já tenho uma conta"}
         </button>
         <small>Contas de jogador são criadas apenas por um convite individual.</small>
       </section>
