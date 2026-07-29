@@ -223,6 +223,18 @@ public class GameChronicleService {
     }
 
     @Transactional
+    public void insertPartyMemberIntoActiveRuns(final UUID partyId, final UUID userId) {
+        final var chronicles = chronicleRepository.findAllByPartyIdAndTypeAndStatus(
+                partyId, ChronicleType.GAME, ChronicleStatusType.IN_PROGRESS
+        );
+        if (chronicles.isEmpty()) return;
+        final var user = userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found."));
+        for (final var chronicle : chronicles) {
+            insertIntoRun(chronicle, user);
+        }
+    }
+
+    @Transactional
     public void regenerate(final UUID partyId, final UUID chronicleId) {
         final var context = chronicleAccessService.requireNarrator(partyId, chronicleId);
         if (context.chronicle().getStatus() != ChronicleStatusType.PUBLISHED
@@ -292,6 +304,43 @@ public class GameChronicleService {
         final var chronicle = run.getChronicle();
         chronicle.setStatus(ChronicleStatusType.AI_PENDING);
         aiJobService.enqueue(chronicle, chronicle.getCreator());
+    }
+
+    private void insertIntoRun(final ChronicleEntity chronicle, final UserEntity user) {
+        final var run = gameRunRepository.findForUpdateByChronicleId(chronicle.getId()).orElse(null);
+        if (run == null || run.getStatus() != GameRunStatusType.IN_PROGRESS) return;
+
+        final var alreadyPresentCycles = gameTurnRepository.findAllByRunIdAndUserId(run.getId(), user.getId())
+                .stream().map(GameTurnEntity::getCycleNumber).collect(Collectors.toSet());
+        final var currentTurn = gameTurnRepository.findByRunIdAndSequenceNumber(run.getId(), run.getCurrentSequence())
+                .orElseThrow(() -> new NotFoundException("Current turn not found."));
+        final var currentCycle = currentTurn.getCycleNumber();
+
+        final var byCycle = new TreeMap<Short, List<GameTurnEntity>>();
+        for (final var turn : gameTurnRepository.findAllByRunIdOrderBySequenceNumberAsc(run.getId())) {
+            byCycle.computeIfAbsent(turn.getCycleNumber(), cycle -> new ArrayList<>()).add(turn);
+        }
+
+        var inserted = false;
+        for (final var entry : byCycle.entrySet()) {
+            final var cycle = entry.getKey();
+            final var cycleTurns = entry.getValue();
+            if (cycle >= currentCycle && !alreadyPresentCycles.contains(cycle)) {
+                final var nextPosition = cycleTurns.getLast().getPositionInCycle() + 1;
+                cycleTurns.add(new GameTurnEntity(run, user, cycle, nextPosition, 0));
+                inserted = true;
+            }
+        }
+        if (!inserted) return;
+
+        var sequence = 0;
+        for (final var cycleTurns : byCycle.values()) {
+            for (final var turn : cycleTurns) {
+                turn.setSequenceNumber(++sequence);
+            }
+        }
+        run.setParticipantCount(byCycle.lastEntry().getValue().size());
+        gameTurnRepository.saveAll(byCycle.values().stream().flatMap(List::stream).toList());
     }
 
     private void activate(final GameTurnEntity turn, final Instant startedAt) {

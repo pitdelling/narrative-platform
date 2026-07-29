@@ -2,6 +2,7 @@ package com.narrativeplatform.app.chronicle.repositories;
 
 import com.narrativeplatform.app.chronicle.models.entities.ChronicleEntity;
 import com.narrativeplatform.app.chronicle.models.enums.ChronicleStatusType;
+import com.narrativeplatform.app.chronicle.models.enums.ChronicleType;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -15,4 +16,6 @@ public interface ChronicleRepository extends JpaRepository<ChronicleEntity, UUID
 
     @EntityGraph(attributePaths = {"creator", "party", "currentGeneratedStory"})
     Optional<ChronicleEntity> findOneById(UUID id);
+
+    List<ChronicleEntity> findAllByPartyIdAndTypeAndStatus(UUID partyId, ChronicleType type, ChronicleStatusType status);
 }

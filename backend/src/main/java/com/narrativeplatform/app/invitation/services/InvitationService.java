@@ -1,6 +1,7 @@
 package com.narrativeplatform.app.invitation.services;
 
 import com.narrativeplatform.app.auth.repositories.UserRepository;
+import com.narrativeplatform.app.chronicle.services.GameChronicleService;
 import com.narrativeplatform.app.invitation.models.entities.PartyInviteEntity;
 import com.narrativeplatform.app.invitation.models.enums.InviteChannelType;
 import com.narrativeplatform.app.invitation.models.requests.CreateInviteRequest;
@@ -38,6 +39,7 @@ public class InvitationService {
     private final PartyMemberRepository memberRepository;
     private final UserRepository userRepository;
     private final PartyAccessService partyAccessService;
+    private final GameChronicleService gameChronicleService;
     private final CurrentUserService currentUserService;
     private final AppProperties properties;
     private final ResendClient resendClient;
@@ -98,6 +100,7 @@ public class InvitationService {
         }
         invite.setConsumedAt(Instant.now());
         invite.setConsumedBy(user);
+        gameChronicleService.insertPartyMemberIntoActiveRuns(invite.getParty().getId(), userId);
     }
 
     @Transactional

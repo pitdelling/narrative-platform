@@ -19,4 +19,7 @@ public interface GameTurnRepository extends JpaRepository<GameTurnEntity, UUID> 
 
     @EntityGraph(attributePaths = {"user", "run", "run.chronicle"})
     List<GameTurnEntity> findAllByStatusAndExpiresAtBefore(GameTurnStatusType status, Instant expiresAt);
+
+    @EntityGraph(attributePaths = "user")
+    List<GameTurnEntity> findAllByRunIdAndUserId(UUID runId, UUID userId);
 }
