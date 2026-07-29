@@ -32,6 +32,11 @@ export interface PartyDetail extends PartySummary {
   members: PartyMember[];
 }
 
+export interface PartyInvitationLink {
+  partyId: string;
+  inviteUrl: string;
+}
+
 export interface ChronicleCard {
   id: string;
   type: ChronicleType;

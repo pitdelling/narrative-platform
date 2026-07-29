@@ -139,17 +139,22 @@ textarea { resize: vertical; line-height: 1.65; }
 .page-header h1 { margin: .15rem 0 .6rem; }
 .page-header p { margin: .3rem 0; color: var(--muted); }
 .header-actions { display: flex; gap: .7rem; flex-wrap: wrap; justify-content: flex-end; }
+.header-top { display: flex; flex-direction: column; align-items: flex-end; gap: .6rem; }
+.invite-chip { display: flex; flex-direction: column; align-items: flex-end; gap: .35rem; max-width: 280px; text-align: right; }
+.invite-chip-hint { color: var(--muted); font-size: .72rem; font-style: italic; line-height: 1.35; }
+.invite-chip-row { display: flex; align-items: center; gap: .4rem; max-width: 100%; }
+.invite-chip-url { display: block; min-width: 0; padding: .3rem .55rem; color: var(--muted); background: rgba(var(--parchment-rgb),.5); border: 1px solid var(--border); border-radius: 6px; font-size: .72rem; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.invite-chip-regenerate { font-size: .7rem; color: var(--muted); }
+.invite-chip-error { color: var(--danger); font-size: .72rem; }
 .party-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 1.2rem; }
 .party-card { min-height: 250px; padding: 1.6rem; }
 .party-card p { color: var(--muted); }
 .party-card small { color: var(--copper); font-weight: 600; }
 .party-sigil { display: grid; place-items: center; width: 50px; height: 50px; margin-bottom: 2rem; color: var(--gold); border: 1px solid var(--border); border-radius: 50%; }
 .create-card { display: grid; gap: .8rem; }
-.notice, .email-invite, .create-chronicle { margin: 1rem 0 1.5rem; padding: 1.2rem; }
+.notice, .create-chronicle { margin: 1rem 0 1.5rem; padding: 1.2rem; }
 .notice input { margin: .7rem 0; }
 .notice > div, .inline-form { display: flex; gap: .7rem; }
-.email-invite summary { color: var(--heading); font-weight: 600; cursor: pointer; }
-.email-invite .inline-form { margin-top: 1rem; }
 .create-chronicle { display: grid; gap: 1rem; }
 .segmented { display: flex; width: fit-content; padding: 4px; background: rgba(var(--parchment-rgb),.65); border-radius: 9px; }
 .segmented button { padding: .55rem .8rem; color: var(--muted); background: none; border: none; border-radius: 7px; }
@@ -391,6 +396,8 @@ textarea { resize: vertical; line-height: 1.65; }
   .page-header { gap: 1rem; }
   .header-actions { width: 100%; justify-content: flex-start; }
   .header-actions .button { flex: 1 1 auto; }
+  .header-top, .invite-chip { width: 100%; align-items: stretch; text-align: left; max-width: none; }
+  .invite-chip-url { max-width: none; }
   .thread-item { grid-template-columns: 32px 1fr; gap: .45rem; }
   .thread-item::before { left: 15px; top: 32px; }
   .thread-marker { width: 32px; height: 32px; font-size: .78rem; }

@@ -4,16 +4,10 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import type { ChronicleCard, PartyDetail, PartyMember, PartyRole } from "@/lib/types";
+import type { ChronicleCard, PartyDetail, PartyInvitationLink, PartyMember, PartyRole } from "@/lib/types";
 import { AppShell } from "@/components/AppShell";
 
-interface InviteResponse {
-  id: string;
-  inviteUrl: string;
-  whatsappUrl: string;
-  expiresAt: string;
-  emailSent: boolean;
-}
+const INVITE_HINT = "Por ordem do Narrador, o bardo espalhou este link pelas tabernas do reino.";
 
 const roleLabels: Record<PartyRole, string> = {
   OWNER: "Proprietário",
@@ -38,8 +32,10 @@ export default function PartyArchivePage() {
   const [initialContent, setInitialContent] = useState("");
   const [cycles, setCycles] = useState(1);
   const [editors, setEditors] = useState<string[]>([]);
-  const [invite, setInvite] = useState<InviteResponse | undefined>(undefined);
-  const [email, setEmail] = useState("");
+  const [invitation, setInvitation] = useState<PartyInvitationLink>();
+  const [copyFeedback, setCopyFeedback] = useState("");
+  const [regenerating, setRegenerating] = useState(false);
+  const [inviteError, setInviteError] = useState("");
   const [message, setMessage] = useState("");
   const narrator = party?.currentUserRole === "OWNER" || party?.currentUserRole === "NARRATOR";
   const owner = party?.currentUserRole === "OWNER";
@@ -51,6 +47,9 @@ export default function PartyArchivePage() {
     ]);
     setParty(partyDetail);
     setChronicles(chronicleCards);
+    if (partyDetail.currentUserRole === "OWNER" || partyDetail.currentUserRole === "NARRATOR") {
+      setInvitation(await api<PartyInvitationLink>(`/parties/${partyId}/invitation`));
+    }
   }, [partyId]);
 
   useEffect(() => {
@@ -81,12 +80,24 @@ export default function PartyArchivePage() {
     }
   }
 
-  async function createInvite(channel: "LINK" | "EMAIL" | "WHATSAPP") {
-    const result = await api<InviteResponse>(`/parties/${partyId}/invites`, {
-      method: "POST",
-      body: JSON.stringify({ channel, recipientContact: email || null }),
-    });
-    setInvite(result);
+  async function copyInviteLink() {
+    if (!invitation) return;
+    await navigator.clipboard.writeText(invitation.inviteUrl);
+    setCopyFeedback("Copiado!");
+    window.setTimeout(() => setCopyFeedback(""), 2000);
+  }
+
+  async function regenerateLink() {
+    if (!window.confirm("Gerar um novo link invalida o link atual imediatamente. Continuar?")) return;
+    setInviteError("");
+    setRegenerating(true);
+    try {
+      setInvitation(await api<PartyInvitationLink>(`/parties/${partyId}/invitation/regenerate`, { method: "POST" }));
+    } catch (cause) {
+      setInviteError(cause instanceof Error ? cause.message : "Não foi possível gerar um novo link.");
+    } finally {
+      setRegenerating(false);
+    }
   }
 
   async function updateRole(member: PartyMember, role: Exclude<PartyRole, "OWNER">) {
@@ -115,35 +126,25 @@ export default function PartyArchivePage() {
           <h1>{party?.name ?? "Carregando..."}</h1>
           <p>Memórias, relatos e verdades registradas pela party.</p>
         </div>
-        <div className="header-actions">
-          <button className="button primary" onClick={() => setShowCreate(!showCreate)}>✎ Registrar crônica</button>
-          {narrator && <button className="button secondary" onClick={() => createInvite("LINK")}>Convidar jogador</button>}
+        <div className="header-top">
+          {narrator && invitation && (
+            <div className="invite-chip">
+              <span className="invite-chip-hint">{INVITE_HINT}</span>
+              <div className="invite-chip-row">
+                <code className="invite-chip-url" title={invitation.inviteUrl}>{invitation.inviteUrl}</code>
+                <button className="button ghost" onClick={copyInviteLink}>{copyFeedback || "Copiar link"}</button>
+              </div>
+              <button className="text-button invite-chip-regenerate" onClick={regenerateLink} disabled={regenerating}>
+                {regenerating ? "Gerando..." : "Gerar novo link"}
+              </button>
+              {inviteError && <small className="invite-chip-error">{inviteError}</small>}
+            </div>
+          )}
+          <div className="header-actions">
+            <button className="button primary" onClick={() => setShowCreate(!showCreate)}>✎ Registrar crônica</button>
+          </div>
         </div>
       </header>
-
-      {invite && (
-        <section className="notice card">
-          <strong>Convite criado</strong>
-          <input readOnly value={invite.inviteUrl} onFocus={(event) => event.currentTarget.select()} />
-          <div>
-            <a className="button secondary" href={invite.whatsappUrl} target="_blank" rel="noreferrer">Abrir no WhatsApp</a>
-            <button className="button ghost" onClick={() => navigator.clipboard.writeText(invite.inviteUrl)}>Copiar link</button>
-            <button className="button ghost" onClick={() => api(`/parties/${partyId}/invites/${invite.id}`, { method: "DELETE" }).then(() => setInvite(undefined))}>Revogar convite</button>
-          </div>
-          <small>Expira em {new Date(invite.expiresAt).toLocaleString("pt-BR")}</small>
-        </section>
-      )}
-
-      {narrator && (
-        <details className="email-invite card">
-          <summary>Enviar convite por email</summary>
-          <div className="inline-form">
-            <input type="email" placeholder="jogador@exemplo.com" value={email} onChange={(event) => setEmail(event.target.value)} />
-            <button className="button secondary" onClick={() => createInvite("EMAIL")}>Criar e enviar</button>
-          </div>
-          <small>Se o Resend não estiver configurado, o link ainda será criado para cópia manual.</small>
-        </details>
-      )}
 
       {narrator && party && (
         <details className="members-panel card">

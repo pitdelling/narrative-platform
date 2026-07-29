@@ -7,7 +7,7 @@ import { getToken, setToken } from "@/lib/auth";
 import type { AuthResponse } from "@/lib/types";
 import { BrandMark } from "@/components/BrandMark";
 
-interface Preview { partyId: string; partyName: string; invitedBy: string; expiresAt: string; }
+interface Preview { partyId: string; partyName: string; invitedBy: string; }
 
 export default function InvitePage() {
   const { token } = useParams<{ token: string }>();
@@ -54,7 +54,7 @@ export default function InvitePage() {
       <BrandMark />
       <p className="eyebrow">Convite individual</p>
       <h1>{preview ? `Você foi convidado para ${preview.partyName}` : "Consultando o convite..."}</h1>
-      {preview && <p>{preview.invitedBy} abriu um lugar para você nesta party. O link só pode ser usado uma vez.</p>}
+      {preview && <p>{preview.invitedBy} abriu um lugar para você nesta party.</p>}
       {hasToken ? <button className="button primary" onClick={acceptExisting}>Aceitar com minha conta</button> : (
         <>
           <div className="segmented"><button type="button" className={mode === "register" ? "active" : ""} onClick={() => setMode("register")}>Criar conta</button><button type="button" className={mode === "login" ? "active" : ""} onClick={() => setMode("login")}>Já tenho conta</button></div>
