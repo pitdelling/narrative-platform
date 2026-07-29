@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { clearToken } from "@/lib/auth";
 import { BrandMark } from "@/components/BrandMark";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 interface CurrentUser {
   id: string;
@@ -142,6 +143,7 @@ export function AppShell({ children, partyId }: { children: ReactNode; partyId?:
               </div>
               <button className="modal-close" type="button" aria-label="Fechar" onClick={() => setAccountOpen(false)}>×</button>
             </div>
+            <ThemeToggle />
             <form className="password-form" onSubmit={changePassword}>
               <label>Senha atual<input type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} required /></label>
               <label>Nova senha<input type="password" minLength={8} maxLength={128} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} required /></label>
