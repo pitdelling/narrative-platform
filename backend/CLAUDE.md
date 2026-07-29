@@ -4,7 +4,7 @@ This file defines the project-specific guidance for the Narrative Platform Sprin
 
 ## Project Overview
 
-This API powers a multi-party narrative RPG platform. The first module is `Arquivo do Cronista`. Authentication uses username and password. Roles are scoped to a party, invitations are one-use and expiring, game-story segments are hidden by the backend, and AI generation is performed only by this service.
+This API powers a multi-party narrative RPG platform. The first module is `Arquivo do Cronista`. Authentication uses username and password. Roles are scoped to a party, each party has one reusable invitation link that a narrator can regenerate at will, game-story segments are hidden by the backend, and AI generation is performed only by this service.
 
 ## Package Structure
 
@@ -84,7 +84,7 @@ Override of the generic parent mapper rule:
 - A user has no global player role. Membership roles exist only inside a party.
 - Public registration creates a user capable of creating narrator-owned parties.
 - Player membership can only be created by accepting a valid invitation.
-- Invitation tokens are stored only as hashes, are one-use, and expire.
+- Each party has exactly one reusable invitation link, identified by an opaque bearer token. Only an active narrator or the owner may view or regenerate it; regenerating it invalidates the previous token immediately and never leaves more than one active link per party. The raw token is persisted (not hash-only) so it can be redisplayed to authorized viewers on demand; `token_hash` is what the public resolution/acceptance endpoints actually query against, so that path never needs read access to the raw value. This is a deliberate trade-off — see `PartyInvitationLinkEntity`'s Javadoc.
 - Game-story ordering is generated and persisted by the backend. The creator is first; remaining active participants are shuffled once. The same order repeats for every cycle.
 - A game can have one, two or three cycles.
 - Game creation requires the creator's opening segment. The opening turn is persisted as submitted during creation, and the next participant becomes active immediately.
@@ -106,10 +106,11 @@ Override of the generic parent mapper rule:
 
 - Passwords use Argon2id through Spring Security.
 - JWT signing secrets must come from configuration and never be committed.
-- OpenAI and Resend secrets are backend-only.
+- OpenAI secrets are backend-only.
 - Controllers must never accept a user ID as proof of identity; derive the current user from the security context.
 - Every party resource access must validate active membership and role.
 - Do not expose disabled users' protected content.
+- Invitation tokens are never logged and never appear in error messages; exception messages on the resolution path stay generic (e.g. `"Invitation not found."`).
 
 ## Build & Run
 

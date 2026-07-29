@@ -2,6 +2,7 @@ package com.narrativeplatform.app.party.services;
 
 import com.narrativeplatform.app.auth.repositories.UserRepository;
 import com.narrativeplatform.app.chronicle.services.GameChronicleService;
+import com.narrativeplatform.app.invitation.services.InvitationService;
 import com.narrativeplatform.app.party.models.entities.PartyEntity;
 import com.narrativeplatform.app.party.models.entities.PartyMemberEntity;
 import com.narrativeplatform.app.party.models.enums.MemberStatusType;
@@ -34,6 +35,7 @@ public class PartyService {
     private final CurrentUserService currentUserService;
     private final PartyAccessService partyAccessService;
     private final GameChronicleService gameChronicleService;
+    private final InvitationService invitationService;
 
     @Transactional
     public PartySummaryResponse create(final CreatePartyRequest request) {
@@ -46,6 +48,7 @@ public class PartyService {
         final var membership = partyMemberRepository.save(new PartyMemberEntity(
                 party, owner, PartyRoleType.OWNER, MemberStatusType.ACTIVE
         ));
+        invitationService.createInitialLink(party, owner);
         return membership.toSummaryResponse();
     }
 

@@ -37,7 +37,6 @@ app:
   public-url: ${APP_PUBLIC_URL:http://localhost:3000}
   jwt-secret: ${JWT_SECRET:change-this-development-secret-with-at-least-sixty-four-characters-1234567890}
   jwt-expiration-hours: ${JWT_EXPIRATION_HOURS:168}
-  invite-expiration-hours: ${INVITE_EXPIRATION_HOURS:168}
   turn-expiration-hours: ${TURN_EXPIRATION_HOURS:24}
   written-lock-expiration-hours: ${WRITTEN_LOCK_EXPIRATION_HOURS:24}
   narrator-reveal-seconds: 10
@@ -45,7 +44,3 @@ app:
     api-key: ${OPENAI_API_KEY:}
     model: ${OPENAI_MODEL:gpt-5-mini}
     base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
-  resend:
-    api-key: ${RESEND_API_KEY:}
-    from-email: ${RESEND_FROM_EMAIL:}
-    base-url: ${RESEND_BASE_URL:https://api.resend.com}

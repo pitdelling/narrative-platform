@@ -1,9 +1,8 @@
 package com.narrativeplatform.app.invitation.controllers;
 
 import com.narrativeplatform.app.invitation.models.requests.AcceptInviteRequest;
-import com.narrativeplatform.app.invitation.models.requests.CreateInviteRequest;
 import com.narrativeplatform.app.invitation.models.responses.InvitePreviewResponse;
-import com.narrativeplatform.app.invitation.models.responses.InviteResponse;
+import com.narrativeplatform.app.invitation.models.responses.PartyInvitationLinkResponse;
 import com.narrativeplatform.app.invitation.services.InvitationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -17,13 +16,14 @@ import java.util.UUID;
 public class InvitationController {
     private final InvitationService invitationService;
 
-    @PostMapping("/api/parties/{partyId}/invites")
-    @ResponseStatus(HttpStatus.CREATED)
-    InviteResponse create(
-            @PathVariable("partyId") final UUID partyId,
-            @Valid @RequestBody final CreateInviteRequest request
-    ) {
-        return invitationService.create(partyId, request);
+    @GetMapping("/api/parties/{partyId}/invitation")
+    PartyInvitationLinkResponse currentLink(@PathVariable("partyId") final UUID partyId) {
+        return invitationService.getCurrentLink(partyId);
+    }
+
+    @PostMapping("/api/parties/{partyId}/invitation/regenerate")
+    PartyInvitationLinkResponse regenerate(@PathVariable("partyId") final UUID partyId) {
+        return invitationService.regenerateLink(partyId);
     }
 
     @GetMapping("/api/invites/{token}")
@@ -35,14 +35,5 @@ public class InvitationController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     void accept(@Valid @RequestBody final AcceptInviteRequest request) {
         invitationService.acceptForCurrentUser(request.token());
-    }
-
-    @DeleteMapping("/api/parties/{partyId}/invites/{inviteId}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    void revoke(
-            @PathVariable("partyId") final UUID partyId,
-            @PathVariable("inviteId") final UUID inviteId
-    ) {
-        invitationService.revoke(partyId, inviteId);
     }
 }

@@ -1,13 +1,13 @@
 package com.narrativeplatform.app.invitation.services;
 
+import com.narrativeplatform.app.auth.models.entities.UserEntity;
 import com.narrativeplatform.app.auth.repositories.UserRepository;
 import com.narrativeplatform.app.chronicle.services.GameChronicleService;
-import com.narrativeplatform.app.invitation.models.entities.PartyInviteEntity;
-import com.narrativeplatform.app.invitation.models.enums.InviteChannelType;
-import com.narrativeplatform.app.invitation.models.requests.CreateInviteRequest;
+import com.narrativeplatform.app.invitation.models.entities.PartyInvitationLinkEntity;
 import com.narrativeplatform.app.invitation.models.responses.InvitePreviewResponse;
-import com.narrativeplatform.app.invitation.models.responses.InviteResponse;
-import com.narrativeplatform.app.invitation.repositories.PartyInviteRepository;
+import com.narrativeplatform.app.invitation.models.responses.PartyInvitationLinkResponse;
+import com.narrativeplatform.app.invitation.repositories.PartyInvitationLinkRepository;
+import com.narrativeplatform.app.party.models.entities.PartyEntity;
 import com.narrativeplatform.app.party.models.entities.PartyMemberEntity;
 import com.narrativeplatform.app.party.models.enums.MemberStatusType;
 import com.narrativeplatform.app.party.models.enums.PartyRoleType;
@@ -16,18 +16,13 @@ import com.narrativeplatform.app.party.services.PartyAccessService;
 import com.narrativeplatform.configuration.AppProperties;
 import com.narrativeplatform.security.CurrentUserService;
 import com.narrativeplatform.shared.exceptions.BadRequestException;
-import com.narrativeplatform.shared.exceptions.ConflictException;
 import com.narrativeplatform.shared.exceptions.NotFoundException;
-import com.narrativeplatform.shared.integrations.ResendClient;
 import com.narrativeplatform.shared.utils.TokenUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 @Service
@@ -35,120 +30,95 @@ import java.util.UUID;
 public class InvitationService {
     private static final String INVITE_PATH = "/invite/";
 
-    private final PartyInviteRepository inviteRepository;
+    private final PartyInvitationLinkRepository linkRepository;
     private final PartyMemberRepository memberRepository;
     private final UserRepository userRepository;
     private final PartyAccessService partyAccessService;
     private final GameChronicleService gameChronicleService;
     private final CurrentUserService currentUserService;
     private final AppProperties properties;
-    private final ResendClient resendClient;
 
     @Transactional
-    public InviteResponse create(final UUID partyId, final CreateInviteRequest request) {
-        final var narratorMembership = partyAccessService.requireNarrator(partyId);
-        validateContact(request);
+    public PartyInvitationLinkResponse getCurrentLink(final UUID partyId) {
+        final var membership = partyAccessService.requireNarrator(partyId);
+        final var link = linkRepository.findById(partyId)
+                .orElseGet(() -> getOrCreateForUpdate(membership.getParty(), membership.getUser()));
+        return toResponse(link);
+    }
+
+    @Transactional
+    public PartyInvitationLinkResponse regenerateLink(final UUID partyId) {
+        final var membership = partyAccessService.requireNarrator(partyId);
+        final var link = getOrCreateForUpdate(membership.getParty(), membership.getUser());
         final var rawToken = TokenUtils.randomToken();
-        final var invite = inviteRepository.save(new PartyInviteEntity(
-                narratorMembership.getParty(), narratorMembership.getUser(), TokenUtils.sha256(rawToken),
-                request.channel(), trimToNull(request.recipientContact()),
-                Instant.now().plus(properties.inviteExpirationHours(), ChronoUnit.HOURS)
-        ));
-        final var inviteUrl = properties.publicUrl() + INVITE_PATH + rawToken;
-        final var message = "%s convidou você para entrar na party %s: %s"
-                .formatted(narratorMembership.getUser().getDisplayName(), narratorMembership.getParty().getName(), inviteUrl);
-        final var whatsappUrl = "https://wa.me/?text=" + URLEncoder.encode(message, StandardCharsets.UTF_8);
-        var emailSent = false;
-        if (request.channel() == InviteChannelType.EMAIL) {
-            emailSent = resendClient.sendInvite(
-                    request.recipientContact(), narratorMembership.getParty().getName(),
-                    narratorMembership.getUser().getDisplayName(), inviteUrl
-            );
-        }
-        return invite.toResponse(inviteUrl, whatsappUrl, emailSent);
+        link.rotate(rawToken, TokenUtils.sha256(rawToken), membership.getUser());
+        return toResponse(link);
+    }
+
+    @Transactional
+    public void createInitialLink(final PartyEntity party, final UserEntity owner) {
+        final var rawToken = TokenUtils.randomToken();
+        linkRepository.save(new PartyInvitationLinkEntity(party, rawToken, TokenUtils.sha256(rawToken), owner));
     }
 
     public InvitePreviewResponse preview(final String rawToken) {
-        final var invite = requireAvailable(rawToken);
-        return invite.toPreviewResponse();
+        return requireCurrentLink(rawToken).toPreviewResponse();
     }
 
     public void validateForRegistration(final String rawToken) {
-        requireAvailable(rawToken);
+        requireCurrentLink(rawToken);
     }
 
     @Transactional
     public void acceptForCurrentUser(final String rawToken) {
-        final var current = currentUserService.require();
-        acceptForUser(rawToken, current.id());
+        acceptForUser(rawToken, currentUserService.require().id());
     }
 
     @Transactional
     public void acceptForUser(final String rawToken, final UUID userId) {
-        final var invite = requireAvailableForUpdate(rawToken);
+        final var link = requireCurrentLink(rawToken);
         final var user = userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found."));
-        final var existing = memberRepository.findByPartyIdAndUserId(invite.getParty().getId(), userId);
+        final var existing = memberRepository.findByPartyIdAndUserId(link.getPartyId(), userId);
         if (existing.isPresent() && existing.get().getStatus() == MemberStatusType.ACTIVE) {
-            throw new ConflictException("You already belong to this party.");
+            return;
         }
         if (existing.isPresent()) {
             final var membership = existing.get();
             membership.setStatus(MemberStatusType.ACTIVE);
             membership.setRole(PartyRoleType.PLAYER);
         } else {
-            memberRepository.save(new PartyMemberEntity(invite.getParty(), user, PartyRoleType.PLAYER, MemberStatusType.ACTIVE));
+            memberRepository.save(new PartyMemberEntity(link.getParty(), user, PartyRoleType.PLAYER, MemberStatusType.ACTIVE));
         }
-        invite.setConsumedAt(Instant.now());
-        invite.setConsumedBy(user);
-        gameChronicleService.insertPartyMemberIntoActiveRuns(invite.getParty().getId(), userId);
+        gameChronicleService.insertPartyMemberIntoActiveRuns(link.getPartyId(), userId);
     }
 
-    @Transactional
-    public void revoke(final UUID partyId, final UUID inviteId) {
-        partyAccessService.requireNarrator(partyId);
-        final var invite = inviteRepository.findById(inviteId).orElseThrow(() -> new NotFoundException("Invite not found."));
-        if (!invite.getParty().getId().equals(partyId)) {
-            throw new NotFoundException("Invite not found.");
-        }
-        invite.setRevokedAt(Instant.now());
-    }
-
-    private PartyInviteEntity requireAvailable(final String rawToken) {
-        validateToken(rawToken);
-        final var invite = inviteRepository.findByTokenHash(TokenUtils.sha256(rawToken))
-                .orElseThrow(() -> new NotFoundException("Invitation not found."));
-        validateAvailability(invite);
-        return invite;
-    }
-
-    private PartyInviteEntity requireAvailableForUpdate(final String rawToken) {
-        validateToken(rawToken);
-        final var invite = inviteRepository.findForUpdateByTokenHash(TokenUtils.sha256(rawToken))
-                .orElseThrow(() -> new NotFoundException("Invitation not found."));
-        validateAvailability(invite);
-        return invite;
-    }
-
-    private void validateToken(final String rawToken) {
+    private PartyInvitationLinkEntity requireCurrentLink(final String rawToken) {
         if (rawToken == null || rawToken.isBlank()) {
             throw new BadRequestException("Invite token is required.");
         }
+        return linkRepository.findByTokenHash(TokenUtils.sha256(rawToken))
+                .orElseThrow(() -> new NotFoundException("Invitation not found."));
     }
 
-    private void validateAvailability(final PartyInviteEntity invite) {
-        if (!invite.isAvailable(Instant.now())) {
-            throw new BadRequestException("Invitation is expired, used or revoked.");
-        }
+    /**
+     * Protects simultaneous regeneration/backfill requests for the same party: {@code party_id}
+     * being the primary key makes a second row for one party structurally impossible, and the
+     * pessimistic write lock taken by {@code findForUpdateById} serializes concurrent callers so
+     * the second one always observes the first one's committed row instead of racing to insert
+     * a duplicate.
+     */
+    private PartyInvitationLinkEntity getOrCreateForUpdate(final PartyEntity party, final UserEntity actor) {
+        return linkRepository.findForUpdateById(party.getId()).orElseGet(() -> {
+            try {
+                final var rawToken = TokenUtils.randomToken();
+                return linkRepository.saveAndFlush(new PartyInvitationLinkEntity(party, rawToken, TokenUtils.sha256(rawToken), actor));
+            } catch (final DataIntegrityViolationException raceLost) {
+                return linkRepository.findForUpdateById(party.getId()).orElseThrow(() -> raceLost);
+            }
+        });
     }
 
-    private void validateContact(final CreateInviteRequest request) {
-        if (request.channel() == InviteChannelType.EMAIL
-                && (request.recipientContact() == null || !request.recipientContact().contains("@"))) {
-            throw new BadRequestException("A valid email is required for email invitations.");
-        }
-    }
-
-    private String trimToNull(final String value) {
-        return value == null || value.isBlank() ? null : value.trim();
+    private PartyInvitationLinkResponse toResponse(final PartyInvitationLinkEntity link) {
+        return link.toResponse(properties.publicUrl() + INVITE_PATH + link.getToken());
     }
 }

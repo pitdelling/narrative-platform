@@ -20,7 +20,7 @@ Na primeira configuração, reserve aproximadamente **1h30 a 3h**. Depois disso,
 - Node.js 20.9 ou superior.
 - Uma conta Supabase para PostgreSQL.
 - Uma conta GitHub.
-- Opcional: chave da API OpenAI e conta Resend.
+- Opcional: chave da API OpenAI.
 
 O backend foi deliberadamente preparado para ser executado pelo IntelliJ. Não é necessário executar Maven ou Java no terminal.
 
@@ -64,8 +64,6 @@ FRONTEND_URL=http://localhost:3000
 APP_PUBLIC_URL=http://localhost:3000
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-5.6-luna
-RESEND_API_KEY=
-RESEND_FROM_EMAIL=
 ```
 
 6. Execute `NarrativePlatformApplication` pelo botão Run do IntelliJ.
@@ -182,16 +180,9 @@ A chave fica somente no backend como `OPENAI_API_KEY`. Nunca crie uma variável 
 
 O modelo é configurável por `OPENAI_MODEL`. O valor padrão do projeto é um modelo econômico atual, mas pode ser alterado sem modificar código.
 
-## 12. Email opcional
+## 12. Convite da party
 
-Sem Resend configurado, o sistema ainda cria o convite e permite copiar o link. Para envio automático:
-
-```text
-RESEND_API_KEY=re_...
-RESEND_FROM_EMAIL=convites@seu-dominio.com
-```
-
-O WhatsApp abre uma mensagem preenchida, mas o clique final em enviar permanece com o narrador.
+Cada party tem um único link de convite reutilizável, visível e regenerável apenas por um narrador ativo ou pelo dono da party (`GET /api/parties/{partyId}/invitation`, `POST /api/parties/{partyId}/invitation/regenerate`). O backend não envia email nem mensagem de WhatsApp automaticamente — compartilhar o link (copiar e colar onde quiser) é responsabilidade do narrador. Regenerar o link invalida o anterior imediatamente.
 
 
 ## 13. Checklist depois do deploy

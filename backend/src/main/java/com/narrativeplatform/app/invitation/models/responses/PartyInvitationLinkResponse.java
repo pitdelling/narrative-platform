@@ -2,5 +2,5 @@ package com.narrativeplatform.app.invitation.models.responses;
 
 import java.util.UUID;
 
-public record InvitePreviewResponse(UUID partyId, String partyName, String invitedBy) {
+public record PartyInvitationLinkResponse(UUID partyId, String inviteUrl) {
 }

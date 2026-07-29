@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS party_invitation_links (
+    party_id UUID PRIMARY KEY REFERENCES parties(id) ON DELETE CASCADE,
+    token VARCHAR(64) NOT NULL UNIQUE,
+    token_hash VARCHAR(64) NOT NULL UNIQUE,
+    created_by UUID NOT NULL REFERENCES users(id),
+    rotated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
