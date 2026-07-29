@@ -106,7 +106,6 @@ function GameView({ partyId, chronicleId }: { partyId: string; chronicleId: stri
         <section className="turn-editor turn-composer card">
           <p className="eyebrow">É a sua vez</p>
           <h2>Continue a história</h2>
-          <textarea rows={11} value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={10000} placeholder="Escreva apenas o que acontece a seguir..." />
           {previousMessage && (
             <aside className="last-message">
               <span>A última mensagem foi:</span>
@@ -114,6 +113,7 @@ function GameView({ partyId, chronicleId }: { partyId: string; chronicleId: stri
               <p>{previousMessage.content}</p>
             </aside>
           )}
+          <textarea rows={11} value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={10000} placeholder="Escreva apenas o que acontece a seguir..." />
           <div className="editor-actions">
             <button className="button secondary" onClick={() => action("/game/draft", { content: draft })}>Salvar</button>
             <button className="button primary" onClick={() => action("/game/publish", { content: draft })} disabled={!draft.trim()}>Publicar e passar</button>
