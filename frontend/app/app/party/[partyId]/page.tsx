@@ -183,8 +183,7 @@ export default function PartyArchivePage() {
                         }
                       }}>Transferir propriedade</button>
                     )}
-                    {member.status !== "REMOVED" && <button className="button danger-outline" onClick={() => removeMember(member)}>Remover</button>}
-                    {member.status === "REMOVED" && <span className="removed-note">Novo convite necessário</span>}
+                    <button className="button danger-outline" onClick={() => removeMember(member)}>Remover</button>
                   </div>
                 )}
               </div>

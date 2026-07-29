@@ -17,7 +17,7 @@ public interface PartyMemberRepository extends JpaRepository<PartyMemberEntity, 
     Optional<PartyMemberEntity> findByPartyIdAndUserId(UUID partyId, UUID userId);
 
     @EntityGraph(attributePaths = "user")
-    List<PartyMemberEntity> findAllByPartyIdOrderByJoinedAtAsc(UUID partyId);
+    List<PartyMemberEntity> findAllByPartyIdAndStatusNotOrderByJoinedAtAsc(UUID partyId, MemberStatusType status);
 
     @EntityGraph(attributePaths = "user")
     List<PartyMemberEntity> findAllByPartyIdAndStatusOrderByJoinedAtAsc(UUID partyId, MemberStatusType status);

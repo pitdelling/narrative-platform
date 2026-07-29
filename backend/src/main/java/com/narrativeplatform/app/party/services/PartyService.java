@@ -57,7 +57,7 @@ public class PartyService {
 
     public PartyDetailResponse detail(final UUID partyId) {
         final var membership = partyAccessService.requireActiveMember(partyId);
-        final var members = partyMemberRepository.findAllByPartyIdOrderByJoinedAtAsc(partyId)
+        final var members = partyMemberRepository.findAllByPartyIdAndStatusNotOrderByJoinedAtAsc(partyId, MemberStatusType.REMOVED)
                 .stream().map(PartyMemberEntity::toMemberResponse).toList();
         return membership.getParty().toDetailResponse(membership.getRole(), members);
     }
@@ -81,6 +81,7 @@ public class PartyService {
         }
         membership.setStatus(MemberStatusType.REMOVED);
         membership.setRole(PartyRoleType.PLAYER);
+        gameChronicleService.removePartyMemberFromActiveRuns(partyId, userId);
     }
 
     @Transactional
