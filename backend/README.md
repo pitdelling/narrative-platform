@@ -14,6 +14,10 @@ Read `CLAUDE.md` before changing code. Local execution and builds are performed 
 
 Flyway owns the database schema in `src/main/resources/db/migration`.
 
+## Mid-game party joins
+
+Accepting an invitation or reactivating a disabled member inserts that person into the current cycle of every `IN_PROGRESS` game chronicle in that party (at the end of the cycle's turn order), and into the same relative position for any remaining cycles. Members who already had a turn in a cycle (e.g. skipped or expired earlier) are left untouched. See `GameChronicleService.insertPartyMemberIntoActiveRuns`.
+
 ## Optional AI configuration
 
 `OPENAI_API_KEY` is optional. Without it, the API starts normally and automatic AI jobs remain pending. Explicit regeneration requests fail with HTTP 503 and the `ai_not_configured` problem code. The project uses the Spring Boot Flyway and RestClient starters so database migrations and `RestClient.Builder` auto-configuration are available on startup.

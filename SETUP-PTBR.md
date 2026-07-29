@@ -227,3 +227,4 @@ Depois de iniciar frontend e backend, valide:
 8. Na página da história-jogo, o editor aparece no topo apenas para a pessoa da vez; abaixo aparece o último trecho visível e, em seguida, a thread completa protegida.
 9. Turnos pulados e expirados aparecem inteiramente em cinza.
 10. Sem `OPENAI_API_KEY`, o backend inicia normalmente. Trabalhos automáticos ficam pendentes e uma regeneração explícita retorna a mensagem de IA não configurada.
+11. Ao aceitar um convite ou reativar um membro desabilitado enquanto uma história-jogo ainda está em andamento, a pessoa entra automaticamente no fim do ciclo atual dessa história (e nos ciclos seguintes, na mesma ordem), sem precisar esperar uma nova história ser criada.
