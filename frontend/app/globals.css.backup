@@ -42,47 +42,41 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  /*
-   * Arcane Editorial Nocturne
-   *
-   * Deep ink backgrounds, slate surfaces, warm ivory typography
-   * and restrained arcane accents.
-   */
-  --navy: #315f95;
-  --navy-deep: #3d73ad;
-  --linen: #0d1117;
-  --parchment: #121923;
-  --parchment-rgb: 18,25,35;
-  --ivory: #fff8e9;
-  --ink: #e8e3da;
-  --muted: #aeb7c3;
-  --gold: #d7a95c;
-  --gold-rgb: 215,169,92;
-  --copper: #c98255;
-  --copper-rgb: 201,130,85;
-  --violet: #9c8bd8;
-  --violet-rgb: 156,139,216;
-  --violet-strong: #d2c9f2;
-  --green: #82bd92;
-  --danger: #e0827b;
-  --danger-rgb: 224,130,123;
-  --border: rgba(166,184,204,.18);
-  --border-rgb: 166,184,204;
+  --navy: #2c5490;
+  --navy-deep: #3a68ac;
+  --linen: #1a1712;
+  --parchment: #14120d;
+  --parchment-rgb: 20,18,13;
+  --ivory: #fbf4e7;
+  --ink: #ece7db;
+  --muted: #a89d8b;
+  --gold: #d9a45f;
+  --gold-rgb: 217,164,95;
+  --copper: #cf9161;
+  --copper-rgb: 207,145,97;
+  --violet: #a99bd6;
+  --violet-rgb: 169,155,214;
+  --violet-strong: #d6cdec;
+  --green: #8fac93;
+  --danger: #d99087;
+  --danger-rgb: 217,144,135;
+  --border: rgba(198,178,145,.20);
+  --border-rgb: 198,178,145;
   --shadow-rgb: 0,0,0;
-  --shadow: 0 14px 38px rgba(var(--shadow-rgb),.30);
+  --shadow: 0 4px 14px rgba(var(--shadow-rgb),.45);
 
-  --heading: #f4ede2;
-  --surface: #1a2432;
-  --surface-rgb: 26,36,50;
-  --overlay-rgb: 3,6,10;
-  --emphasis-rgb: 215,169,92;
-  --disabled-fg: #929ca8;
-  --disabled-bg: rgba(116,126,138,.22);
-  --disabled-rgb: 146,156,168;
-  --neutral-fg: #aab2bc;
-  --neutral-bg: #2a323d;
-  --neutral-rgb: 170,178,188;
-  --removed-wash: rgba(150,160,170,.07);
+  --heading: #c7d5ea;
+  --surface: #241f18;
+  --surface-rgb: 36,31,24;
+  --overlay-rgb: 9,28,55;
+  --emphasis-rgb: 217,164,95;
+  --disabled-fg: #9a9a9a;
+  --disabled-bg: rgba(120,120,120,.28);
+  --disabled-rgb: 190,190,190;
+  --neutral-fg: #b0b0b0;
+  --neutral-bg: #3a3a38;
+  --neutral-rgb: 150,150,150;
+  --removed-wash: rgba(160,160,160,.08);
 }
 * { box-sizing: border-box; }
 html, body { min-height: 100%; }
@@ -195,94 +189,6 @@ textarea { resize: vertical; line-height: 1.65; }
 .turn-editor, .written-editor { margin-top: 2rem; padding: 1.5rem; }
 .editor-actions { display: flex; gap: .6rem; flex-wrap: wrap; margin-top: 1rem; }
 .lock-banner { margin-bottom: 1rem; padding: .7rem; background: rgba(var(--copper-rgb),.12); border-left: 3px solid var(--copper); }
-
-/* Arcane Editorial Nocturne refinements */
-:root[data-theme="dark"] body {
-  background-color: var(--linen);
-  background-image:
-          radial-gradient(circle at 15% 0%, rgba(var(--gold-rgb),.045), transparent 34rem),
-          repeating-linear-gradient(0deg, rgba(166,184,204,.012) 0 1px, transparent 1px 4px);
-}
-
-:root[data-theme="dark"] .card {
-  background: rgba(var(--surface-rgb),.96);
-  box-shadow:
-          0 1px 0 rgba(255,255,255,.025) inset,
-          var(--shadow);
-}
-
-:root[data-theme="dark"] .sidebar {
-  background: rgba(var(--parchment-rgb),.92);
-}
-
-:root[data-theme="dark"] input,
-:root[data-theme="dark"] textarea,
-:root[data-theme="dark"] select {
-  background: #111822;
-  border-color: rgba(var(--border-rgb),.24);
-}
-
-:root[data-theme="dark"] input::placeholder,
-:root[data-theme="dark"] textarea::placeholder {
-  color: rgba(174,183,195,.66);
-}
-
-:root[data-theme="dark"] input:hover,
-:root[data-theme="dark"] textarea:hover,
-:root[data-theme="dark"] select:hover {
-  border-color: rgba(var(--border-rgb),.38);
-}
-
-:root[data-theme="dark"] input:focus-visible,
-:root[data-theme="dark"] textarea:focus-visible,
-:root[data-theme="dark"] select:focus-visible {
-  border-color: var(--gold);
-  box-shadow: 0 0 0 3px rgba(var(--gold-rgb),.16);
-}
-
-:root[data-theme="dark"] .button.secondary:hover,
-:root[data-theme="dark"] .button.ghost:hover,
-:root[data-theme="dark"] .thread-actions button:hover,
-:root[data-theme="dark"] .modal-close:hover,
-:root[data-theme="dark"] .sidebar-close:hover {
-  background: rgba(var(--parchment-rgb),.72);
-  border-color: rgba(var(--border-rgb),.34);
-}
-
-:root[data-theme="dark"] .thread-marker {
-  background: var(--parchment);
-}
-
-:root[data-theme="dark"] .turn-composer {
-  border-color: rgba(var(--gold-rgb),.52);
-  box-shadow:
-          0 0 0 1px rgba(var(--gold-rgb),.12),
-          0 16px 42px rgba(var(--shadow-rgb),.28);
-}
-
-:root[data-theme="dark"] .hidden-fragment-cover {
-  background: repeating-linear-gradient(
-          135deg,
-          rgba(var(--parchment-rgb),.98) 0 8px,
-          rgba(var(--surface-rgb),.86) 8px 9px
-  );
-}
-
-:root[data-theme="dark"] .art-1 {
-  color: var(--gold);
-  background-color: #2a3442;
-}
-
-:root[data-theme="dark"] .art-2 {
-  color: var(--green);
-  background-color: #26372f;
-}
-
-:root[data-theme="dark"] .art-3 {
-  color: var(--ivory);
-  background-color: #3c3156;
-}
-
 @media (max-width: 900px) {
   .auth-page { grid-template-columns: 1fr; }
   .auth-story h1 { margin-top: 3rem; }
