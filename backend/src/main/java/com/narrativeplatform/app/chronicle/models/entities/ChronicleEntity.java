@@ -72,8 +72,11 @@ public class ChronicleEntity {
     @Column(nullable = false)
     private long version;
 
-    public ChronicleCardResponse toCardResponse() {
-        return new ChronicleCardResponse(id, type, status, title, generatedPreview, creator.getDisplayName(), updatedAt, status == ChronicleStatusType.PUBLISHED);
+    public ChronicleCardResponse toCardResponse(final Integer completedTurns, final Integer totalTurns, final Boolean awaitingCurrentUser) {
+        return new ChronicleCardResponse(
+                id, type, status, title, generatedPreview, creator.getDisplayName(), createdAt, updatedAt,
+                status == ChronicleStatusType.PUBLISHED, completedTurns, totalTurns, awaitingCurrentUser
+        );
     }
 
     public ChronicleEntity(
