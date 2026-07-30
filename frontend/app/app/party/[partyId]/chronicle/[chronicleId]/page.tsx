@@ -6,6 +6,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import type { GameDetail, PartyDetail, Segment, WrittenDetail } from "@/lib/types";
 import { AppShell } from "@/components/AppShell";
+import { DragonPanel } from "@/components/DragonPanel";
 
 export default function ChronicleDetailPage() {
   const { partyId, chronicleId } = useParams<{ partyId: string; chronicleId: string }>();
@@ -125,9 +126,14 @@ function GameView({ partyId, chronicleId }: { partyId: string; chronicleId: stri
 
       {data.generatedStory && (
         <article className="generated-story card">
-          <p className="eyebrow">Versão do Cronista · v{data.generatedStory.version}</p>
-          <h2>{data.generatedStory.title}</h2>
-          <div className="story-prose">{data.generatedStory.content}</div>
+          <div className="story-prose-frame">
+            <div className="story-prose-column">
+              <p className="eyebrow">Versão do Cronista · v{data.generatedStory.version}</p>
+              <h2>{data.generatedStory.title}</h2>
+              <div className="story-prose">{data.generatedStory.content}</div>
+            </div>
+            <DragonPanel />
+          </div>
         </article>
       )}
 
