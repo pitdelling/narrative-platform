@@ -3,10 +3,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
+import { turnProgress } from "@/lib/progress";
 import type { GameDetail, PartyDetail, Segment, WrittenDetail } from "@/lib/types";
 import { AppShell } from "@/components/AppShell";
-import { DragonPanel } from "@/components/DragonPanel";
+import { ChronicleCompletedHeader } from "@/components/chronicle/ChronicleCompletedHeader";
+import { CanonMapPanel } from "@/components/chronicle/CanonMapPanel";
+import { GameProgressBar } from "@/components/chronicle/GameProgressBar";
+import { StoryModal } from "@/components/chronicle/StoryModal";
+import { ThreadSegmentRow } from "@/components/chronicle/ThreadSegmentRow";
 
 export default function ChronicleDetailPage() {
   const { partyId, chronicleId } = useParams<{ partyId: string; chronicleId: string }>();
@@ -22,14 +27,26 @@ export default function ChronicleDetailPage() {
 
 function GameView({ partyId, chronicleId }: { partyId: string; chronicleId: string }) {
   const [data, setData] = useState<GameDetail>();
+  const [party, setParty] = useState<PartyDetail>();
+  const [loadError, setLoadError] = useState<ApiError>();
   const [draft, setDraft] = useState("");
   const [revealed, setRevealed] = useState(false);
   const [message, setMessage] = useState("");
+  const [storyModalOpen, setStoryModalOpen] = useState(false);
 
   const load = useCallback(async (reveal = false) => {
-    const detail = await api<GameDetail>(`/parties/${partyId}/chronicles/${chronicleId}/game?reveal=${reveal}`);
-    setData(detail);
-    setDraft(detail.currentDraft ?? "");
+    try {
+      const [detail, partyDetail] = await Promise.all([
+        api<GameDetail>(`/parties/${partyId}/chronicles/${chronicleId}/game?reveal=${reveal}`),
+        api<PartyDetail>(`/parties/${partyId}`),
+      ]);
+      setData(detail);
+      setParty(partyDetail);
+      setDraft(detail.currentDraft ?? "");
+      setLoadError(undefined);
+    } catch (cause) {
+      setLoadError(cause instanceof ApiError ? cause : new ApiError("Não foi possível carregar a crônica.", 0));
+    }
   }, [partyId, chronicleId]);
 
   useEffect(() => {
@@ -50,6 +67,8 @@ function GameView({ partyId, chronicleId }: { partyId: string; chronicleId: stri
       .filter((segment) => segment.visible && segment.status !== "DISABLED" && segment.sequenceNumber < data.currentSequence)
       .sort((left, right) => right.sequenceNumber - left.sequenceNumber)[0];
   }, [data]);
+
+  const progress = useMemo(() => turnProgress(data?.turns ?? []), [data]);
 
   async function action(path: string, body?: unknown, method = "POST") {
     setMessage("");
@@ -84,24 +103,70 @@ function GameView({ partyId, chronicleId }: { partyId: string; chronicleId: stri
     if (content) await action(`/segments/${segment.id}/edit`, { content, reason: "Edited by narrator." });
   }
 
-  if (!data) return <p>Consultando a crônica...</p>;
+  if (loadError) {
+    const description = loadError.status === 403
+      ? "Você não tem acesso a esta crônica."
+      : loadError.status === 404
+        ? "Crônica não encontrada."
+        : loadError.message;
+    return (
+      <>
+        <Link className="back-link" href={`/app/party/${partyId}`}>← Voltar às crônicas</Link>
+        <p className="error-message">{description}</p>
+      </>
+    );
+  }
+
+  if (!data || !party) return <p>Consultando a crônica...</p>;
+
+  const finished = data.status !== "IN_PROGRESS";
+  // "Re-executar IA" is intentionally the same action as "Regenerar história": the Mapa do
+  // cânone has no AI generation of its own yet (still an honest placeholder), so there is
+  // nothing extra to re-run for it today.
+  const canRegenerate = data.narrator && ["PUBLISHED", "FAILED"].includes(data.status);
+  const isRegenerating = data.narrator && ["AI_PENDING", "AI_PROCESSING"].includes(data.status);
+
+  const headerActions = (
+    <>
+      {data.narrator && data.status === "IN_PROGRESS" && <button className="button secondary" onClick={() => action("/game/skip")}>Pular turno atual</button>}
+      {data.narrator && data.status === "IN_PROGRESS" && <button className="button secondary" onClick={reveal} disabled={revealed}>{revealed ? `Revelado por ${data.revealSeconds}s` : "Revelar todos os trechos"}</button>}
+      {finished && <button className="button primary" onClick={() => setStoryModalOpen(true)}>Ver história adaptada</button>}
+      {(canRegenerate || isRegenerating) && (
+        <button className="button secondary" onClick={() => action("/regenerate")} disabled={isRegenerating}>
+          {isRegenerating ? "Gerando..." : "Re-executar IA"}
+        </button>
+      )}
+      {data.narrator && <button className="button ghost" onClick={() => api(`/parties/${partyId}/chronicles/${chronicleId}`, { method: "DELETE" }).then(() => { window.location.href = `/app/party/${partyId}`; })}>Arquivar</button>}
+    </>
+  );
 
   return (
     <>
       <Link className="back-link" href={`/app/party/${partyId}`}>← Voltar às crônicas</Link>
-      <header className="page-header">
-        <div>
-          <p className="eyebrow">História-jogo · {data.cycleCount} ciclo(s)</p>
-          <h1>{data.title}</h1>
-          <p>Turno {data.currentSequence} de {data.totalTurns} · {data.status.replaceAll("_", " ")}</p>
-        </div>
-        <div className="header-actions">
-          {data.narrator && data.status === "IN_PROGRESS" && <button className="button secondary" onClick={() => action("/game/skip")}>Pular turno atual</button>}
-          {data.narrator && data.status === "IN_PROGRESS" && <button className="button secondary" onClick={reveal} disabled={revealed}>{revealed ? `Revelado por ${data.revealSeconds}s` : "Revelar todos os trechos"}</button>}
-          {data.narrator && ["PUBLISHED", "FAILED"].includes(data.status) && <button className="button primary" onClick={() => action("/regenerate")}>Regenerar história</button>}
-          {data.narrator && <button className="button ghost" onClick={() => api(`/parties/${partyId}/chronicles/${chronicleId}`, { method: "DELETE" }).then(() => { window.location.href = `/app/party/${partyId}`; })}>Arquivar</button>}
-        </div>
-      </header>
+
+      {finished ? (
+        <ChronicleCompletedHeader
+          title={data.title}
+          partyName={party.name}
+          creatorName={data.creatorName}
+          createdAt={data.createdAt}
+          completedAt={data.completedAt}
+          cycleCount={data.cycleCount}
+          totalTurns={data.totalTurns}
+          completedTurns={progress.completed}
+          actions={headerActions}
+        />
+      ) : (
+        <header className="page-header">
+          <div>
+            <p className="eyebrow">História-jogo · {data.cycleCount} ciclo(s)</p>
+            <h1>{data.title}</h1>
+            <GameProgressBar completed={progress.completed} total={progress.total} />
+            <p>Turno {data.currentSequence} de {data.totalTurns} · {data.status.replaceAll("_", " ")}</p>
+          </div>
+          <div className="header-actions">{headerActions}</div>
+        </header>
+      )}
 
       {data.currentUserTurn && (
         <section className="turn-editor turn-composer card">
@@ -124,97 +189,45 @@ function GameView({ partyId, chronicleId }: { partyId: string; chronicleId: stri
         </section>
       )}
 
-      {data.generatedStory && (
-        <article className="generated-story card">
-          <div className="story-prose-frame">
-            <div className="story-prose-column">
-              <p className="eyebrow">Versão do Cronista · v{data.generatedStory.version}</p>
-              <h2>{data.generatedStory.title}</h2>
-              <div className="story-prose">{data.generatedStory.content}</div>
-            </div>
-            <DragonPanel />
-          </div>
-        </article>
-      )}
+      {finished && <CanonMapPanel />}
 
-      {["AI_PENDING", "AI_PROCESSING"].includes(data.status) && (
-        <div className="notice card">
-          <strong>O Cronista está organizando os fragmentos.</strong>
-          <p>Sem uma chave de IA configurada, a thread permanece concluída e o trabalho aguarda processamento.</p>
-        </div>
-      )}
-
-      <section className="thread">
+      <section className="thread" aria-labelledby="thread-heading">
         <div className="section-heading">
-          <h2>Thread original</h2>
+          <h2 id="thread-heading">Thread original</h2>
           <span>O autor de cada etapa permanece visível.</span>
         </div>
-        {data.turns.map((turn) => {
-          const segment = segments.get(turn.sequenceNumber);
-          const classNames = [
-            "thread-item",
-            segment?.status === "DISABLED" ? "disabled" : "",
-            turn.status === "SKIPPED" ? "skipped" : "",
-            turn.status === "EXPIRED" ? "expired" : "",
-          ].filter(Boolean).join(" ");
-          return (
-            <article key={turn.id} className={classNames}>
-              <div className="thread-marker">{turn.sequenceNumber}</div>
-              <div className="thread-body card">
-                <div className="thread-meta">
-                  <strong>{turn.author}</strong>
-                  <span>Ciclo {turn.cycleNumber} · {turn.status}</span>
-                </div>
-                {segment
-                  ? segment.visible
-                    ? (
-                      <>
-                        <p className="segment-content">{segment.status === "DISABLED" ? "Removido pelo Narrador" : segment.content}</p>
-                        {segment.status === "DISABLED" && segment.disabledReason && <p className="removal-reason">Motivo: {segment.disabledReason}</p>}
-                        {data.narrator && (
-                          <div className="thread-actions">
-                            <button onClick={() => edit(segment)}>Editar</button>
-                            {segment.status === "DISABLED"
-                              ? <button onClick={() => action(`/segments/${segment.id}/restore`)}>Restaurar</button>
-                              : <button onClick={() => disable(segment)}>Desabilitar</button>}
-                          </div>
-                        )}
-                      </>
-                    )
-                    : <HiddenBlock size={segment.size} />
-                  : <PendingBlock status={turn.status} />}
-              </div>
-            </article>
-          );
-        })}
+        <ol className="thread-list">
+          {data.turns.map((turn) => (
+            <li key={turn.id}>
+              <ThreadSegmentRow
+                turn={turn}
+                segment={segments.get(turn.sequenceNumber)}
+                narrator={data.narrator}
+                onEdit={edit}
+                onDisable={disable}
+                onRestore={(segment) => action(`/segments/${segment.id}/restore`)}
+              />
+            </li>
+          ))}
+        </ol>
+        {finished && <p className="thread-end-note">Fim da thread original.</p>}
       </section>
 
       {message && <p className="error-message action-message">{message}</p>}
+
+      <StoryModal
+        open={storyModalOpen}
+        onClose={() => setStoryModalOpen(false)}
+        partyId={partyId}
+        chronicleId={chronicleId}
+        status={data.status}
+        currentStory={data.generatedStory}
+        canRegenerate={canRegenerate}
+        isRegenerating={isRegenerating}
+        onRegenerate={() => action("/regenerate")}
+      />
     </>
   );
-}
-
-function HiddenBlock({ size }: { size: Segment["size"] }) {
-  return (
-    <div className={`hidden-fragment hidden-${size.toLowerCase()}`}>
-      <div className="hidden-fragment-easter-egg" aria-hidden="true">
-        Aaaaaaaahhhhh seu elfo esperto, achou mesmo que você veria o texto dos outros? O Narrador é tudo, sabe tudo E VÊ TUDO!
-      </div>
-      <div className="hidden-fragment-cover">
-        <span>◌ Fragmento velado</span>
-        <small>O conteúdo ainda não foi revelado para você.</small>
-      </div>
-    </div>
-  );
-}
-
-function PendingBlock({ status }: { status: string }) {
-  const label = status === "SKIPPED"
-    ? "Turno pulado"
-    : status === "EXPIRED"
-      ? "Turno expirado"
-      : "Aguardando este fragmento";
-  return <div className={`pending-fragment pending-${status.toLowerCase()}`}><span>{label}</span></div>;
 }
 
 function WrittenView({ partyId, chronicleId }: { partyId: string; chronicleId: string }) {

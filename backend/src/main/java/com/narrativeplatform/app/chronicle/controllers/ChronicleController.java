@@ -124,6 +124,14 @@ public class ChronicleController {
         gameChronicleService.restoreSegment(partyId, chronicleId, segmentId);
     }
 
+    @GetMapping("/{chronicleId}/generated-stories")
+    List<GeneratedStoryResponse> generatedStoryHistory(
+            @PathVariable("partyId") final UUID partyId,
+            @PathVariable("chronicleId") final UUID chronicleId
+    ) {
+        return gameChronicleService.listGeneratedStories(partyId, chronicleId);
+    }
+
     @PostMapping("/{chronicleId}/regenerate")
     @ResponseStatus(HttpStatus.ACCEPTED)
     void regenerate(

@@ -19,6 +19,7 @@ import com.narrativeplatform.shared.exceptions.ForbiddenException;
 import com.narrativeplatform.shared.exceptions.NotFoundException;
 import com.narrativeplatform.shared.exceptions.TurnExpiredException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +30,7 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class GameChronicleService {
@@ -39,6 +41,7 @@ public class GameChronicleService {
     private final GameTurnRepository gameTurnRepository;
     private final GameDraftRepository gameDraftRepository;
     private final GameSegmentRepository gameSegmentRepository;
+    private final GeneratedStoryRepository generatedStoryRepository;
     private final SegmentRevisionRepository segmentRevisionRepository;
     private final PartyMemberRepository partyMemberRepository;
     private final UserRepository userRepository;
@@ -83,6 +86,10 @@ public class GameChronicleService {
         final var nextTurn = turns.get(1);
         run.setCurrentSequence(nextTurn.getSequenceNumber());
         activate(nextTurn, startedAt);
+        log.debug(
+                "Created game chronicle {} for party {} with {} cycle(s) and {} participant(s).",
+                chronicle.getId(), partyId, request.cycleCount(), orderedUsers.size()
+        );
         return chronicle.getId();
     }
 
@@ -120,11 +127,21 @@ public class GameChronicleService {
                 : null;
         return new GameChronicleDetailResponse(
                 context.chronicle().getId(), context.chronicle().getTitle(), context.chronicle().getStatus(),
+                context.chronicle().getCreator().getDisplayName(), context.chronicle().getCreatedAt(), run.getCompletedAt(),
                 run.getCycleCount(), run.getCurrentSequence(), turns.size(), current.id(), currentUserTurn,
                 context.narrator(), properties.narratorRevealSeconds(), currentDraft,
                 context.chronicle().getCurrentGeneratedStory() == null ? null : context.chronicle().getCurrentGeneratedStory().toResponse(),
                 turns.stream().map(GameTurnEntity::toResponse).toList(), segmentResponses
         );
+    }
+
+    public List<GeneratedStoryResponse> listGeneratedStories(final UUID partyId, final UUID chronicleId) {
+        final var context = chronicleAccessService.requireMember(partyId, chronicleId);
+        if (context.chronicle().getType() != ChronicleType.GAME) {
+            throw new BadRequestException("This chronicle is not a game chronicle.");
+        }
+        return generatedStoryRepository.findAllByChronicleIdOrderByVersionNumberDesc(chronicleId)
+                .stream().map(GeneratedStoryEntity::toResponse).toList();
     }
 
     @Transactional(noRollbackFor = TurnExpiredException.class)
@@ -251,6 +268,7 @@ public class GameChronicleService {
                 && context.chronicle().getStatus() != ChronicleStatusType.FAILED) {
             throw new BadRequestException("The chronicle is not ready for regeneration.");
         }
+        log.debug("Regeneration requested for chronicle {} by user {}.", chronicleId, context.membership().getUser().getId());
         aiJobService.enqueueRequested(context.chronicle(), context.membership().getUser());
     }
 
@@ -258,6 +276,7 @@ public class GameChronicleService {
     @Transactional
     public void expireTurns() {
         final var expiredTurns = gameTurnRepository.findAllByStatusAndExpiresAtBefore(GameTurnStatusType.ACTIVE, Instant.now());
+        if (!expiredTurns.isEmpty()) log.debug("Expiration sweep found {} candidate turn(s).", expiredTurns.size());
         for (final var turn : expiredTurns) {
             final var run = gameRunRepository.findForUpdateByChronicleId(turn.getRun().getChronicle().getId()).orElse(null);
             if (run == null) continue;
@@ -265,6 +284,7 @@ public class GameChronicleService {
             if (current == null || current.getStatus() != GameTurnStatusType.ACTIVE || !current.getId().equals(turn.getId())) continue;
             current.setStatus(GameTurnStatusType.EXPIRED);
             gameDraftRepository.deleteById(current.getId());
+            log.debug("Turn {} expired for chronicle {}.", current.getId(), run.getChronicle().getId());
             advance(run, current.getSequenceNumber());
         }
     }
@@ -307,6 +327,7 @@ public class GameChronicleService {
         if (next.isPresent()) {
             run.setCurrentSequence(nextSequence);
             activate(next.get(), Instant.now());
+            log.debug("Chronicle {} advanced to turn {} (user {}).", run.getChronicle().getId(), nextSequence, next.get().getUser().getId());
             return;
         }
         completeRun(run);
@@ -317,6 +338,7 @@ public class GameChronicleService {
         run.setCompletedAt(Instant.now());
         final var chronicle = run.getChronicle();
         chronicle.setStatus(ChronicleStatusType.AI_PENDING);
+        log.info("Game chronicle {} completed; queued initial AI generation.", chronicle.getId());
         aiJobService.enqueue(chronicle, chronicle.getCreator());
     }
 

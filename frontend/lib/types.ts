@@ -44,8 +44,12 @@ export interface ChronicleCard {
   title: string;
   preview?: string;
   creatorName: string;
+  createdAt: string;
   updatedAt: string;
   published: boolean;
+  completedTurns?: number;
+  totalTurns?: number;
+  awaitingCurrentUser?: boolean;
 }
 
 export interface Turn {
@@ -87,6 +91,9 @@ export interface GameDetail {
   id: string;
   title: string;
   status: ChronicleStatus;
+  creatorName: string;
+  createdAt: string;
+  completedAt?: string;
   cycleCount: number;
   currentSequence: number;
   totalTurns: number;
