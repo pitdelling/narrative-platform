@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Componente completo de dragão ornamental em CSS</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        :root {
+            --dragon-head-width: 46px;
+            --dragon-unit-width: 88px;
+            --dragon-tail-width: 76px;
+        }
+
+        html,
+        body {
+            min-height: 100%;
+            margin: 0;
+        }
+
+        /*
+          O preview usa somente as cores do sistema/navegador.
+          O componente do dragão não define uma paleta própria.
+        */
+        body {
+            padding: 32px;
+            color: CanvasText;
+            background: Canvas;
+            font-family:
+                    Inter, ui-sans-serif, system-ui, -apple-system,
+                    BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
+        .preview {
+            width: min(1100px, 100%);
+            margin-inline: auto;
+        }
+
+        h1 {
+            margin: 0 0 12px;
+            font-size: clamp(30px, 5vw, 56px);
+            line-height: 1;
+        }
+
+        p {
+            max-width: 70ch;
+            margin: 0;
+            line-height: 1.65;
+        }
+
+        .examples {
+            display: grid;
+            gap: 32px;
+            margin-top: 36px;
+        }
+
+        .example {
+            min-width: 0;
+            padding: 24px;
+            border: 1px solid currentColor;
+            overflow: hidden;
+
+            /*
+              Cor usada para recortar o olho.
+              Em integração real, substitua pelo fundo atrás do dragão.
+            */
+            --dragon-cutout: Canvas;
+        }
+
+        .example h2 {
+            margin: 0 0 18px;
+            font-size: 18px;
+        }
+
+        .dragon-stage {
+            min-height: 90px;
+            display: flex;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        /* =========================================================
+           COMPONENTE DO DRAGÃO
+           ========================================================= */
+
+        .dragon {
+            display: inline-flex;
+            flex: 0 0 auto;
+            align-items: center;
+
+            height: 64px;
+            min-width: 0;
+
+            color: inherit;
+        }
+
+        /*
+          Espelha o dragão inteiro horizontalmente.
+          Não existe inversão vertical.
+        */
+        .dragon--reverse {
+            transform: scaleX(-1);
+        }
+
+        /* =========================================================
+           CABEÇA
+           ========================================================= */
+
+        .dragon__head {
+            position: relative;
+            z-index: 4;
+
+            flex: 0 0 var(--dragon-head-width);
+            width: var(--dragon-head-width);
+            height: 34px;
+            margin-right: -4px;
+
+            background: currentColor;
+
+            clip-path: polygon(
+                    0% 52%,
+                    3% 40%,
+                    8% 31%,
+                    14% 25%,
+                    18% 20%,
+                    16% 14%,
+                    22% 15%,
+                    30% 19%,
+                    40% 19%,
+                    49% 13%,
+                    60% 5%,
+                    78% 0%,
+                    100% 0%,
+                    79% 12%,
+                    66% 24%,
+                    59% 33%,
+                    74% 29%,
+                    95% 29%,
+                    84% 39%,
+                    71% 44%,
+                    84% 45%,
+                    76% 52%,
+                    65% 56%,
+                    49% 57%,
+                    58% 65%,
+                    47% 64%,
+                    39% 71%,
+                    29% 78%,
+                    18% 76%,
+                    21% 67%,
+                    12% 61%,
+                    9% 56%
+            );
+        }
+
+        .dragon__head::before {
+            content: "";
+
+            position: absolute;
+            left: 16px;
+            top: 11px;
+
+            width: 8px;
+            height: 5px;
+
+            background: var(--dragon-cutout);
+
+            clip-path: polygon(
+                    0% 70%,
+                    20% 20%,
+                    60% 0%,
+                    100% 20%,
+                    72% 100%,
+                    18% 92%
+            );
+        }
+
+        .dragon__head::after {
+            content: "";
+
+            position: absolute;
+            left: 18px;
+            top: 12px;
+
+            width: 2px;
+            height: 2px;
+
+            background: currentColor;
+            border-radius: 50%;
+        }
+
+        /* =========================================================
+           CORPO
+           ========================================================= */
+
+        .dragon__body {
+            position: relative;
+            z-index: 2;
+
+            display: inline-flex;
+            flex: 0 0 auto;
+            align-items: stretch;
+
+            height: 56px;
+        }
+
+        /*
+          Linha contínua do corpo.
+          Atravessa todas as unidades de asa e pata.
+        */
+        .dragon__body::before {
+            content: "";
+
+            position: absolute;
+            z-index: 1;
+
+            left: -2px;
+            right: -2px;
+            top: 50%;
+
+            height: 1.3px;
+
+            background: currentColor;
+            transform: translateY(-50%);
+        }
+
+        /*
+          Cada unidade contém uma asa e uma pata.
+          A largura fixa mantém o espaçamento constante.
+        */
+        .dragon__unit {
+            position: relative;
+            z-index: 2;
+
+            flex: 0 0 var(--dragon-unit-width);
+            width: var(--dragon-unit-width);
+            height: 56px;
+        }
+
+        /* =========================================================
+           ASA
+           ========================================================= */
+
+        .dragon__unit::before {
+            content: "";
+
+            position: absolute;
+            left: 0;
+            bottom: 49%;
+
+            width: 100%;
+            height: 37px;
+
+            background: currentColor;
+
+            -webkit-mask-image:
+                    url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20100%2048%22%3E%3Cg%20transform%3D%22translate%28100%200%29%20scale%28-1%201%29%22%3E%3Cpath%20fill%3D%22black%22%20d%3D%22M98%2011C74-2%2036-6%202%2018C34%202%2067%203%2090%2017C72%2016%2056%2023%2043%2046C44%2031%2040%2021%2029%2017C50%2013%2068%2016%2080%2023C74%2030%2074%2039%2079%2047C80%2032%2086%2021%2098%2016Z%22/%3E%3C/g%3E%3C/svg%3E");
+
+            -webkit-mask-repeat: no-repeat;
+            -webkit-mask-position: left bottom;
+            -webkit-mask-size: 100% 37px;
+
+            mask-image:
+                    url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20100%2048%22%3E%3Cg%20transform%3D%22translate%28100%200%29%20scale%28-1%201%29%22%3E%3Cpath%20fill%3D%22black%22%20d%3D%22M98%2011C74-2%2036-6%202%2018C34%202%2067%203%2090%2017C72%2016%2056%2023%2043%2046C44%2031%2040%2021%2029%2017C50%2013%2068%2016%2080%2023C74%2030%2074%2039%2079%2047C80%2032%2086%2021%2098%2016Z%22/%3E%3C/g%3E%3C/svg%3E");
+
+            mask-repeat: no-repeat;
+            mask-position: left bottom;
+            mask-size: 100% 37px;
+        }
+
+        /* =========================================================
+           PATA
+           ========================================================= */
+
+        .dragon__unit::after {
+            content: "";
+
+            position: absolute;
+            left: 0;
+            top: 50%;
+
+            width: 100%;
+            height: 22px;
+
+            background: currentColor;
+
+            -webkit-mask:
+                    linear-gradient(
+                            63deg,
+                            transparent 0 44%,
+                            #000 45% 55%,
+                            transparent 56%
+                    )
+                    0 0 / 100% 17px no-repeat,
+
+                    radial-gradient(
+                            ellipse 13px 5px at 50% 0,
+                            #000 0 35%,
+                            transparent 39%
+                    )
+                    17px 14px / 100% 8px no-repeat;
+
+            mask:
+                    linear-gradient(
+                            63deg,
+                            transparent 0 44%,
+                            #000 45% 55%,
+                            transparent 56%
+                    )
+                    0 0 / 100% 17px no-repeat,
+
+                    radial-gradient(
+                            ellipse 13px 5px at 50% 0,
+                            #000 0 35%,
+                            transparent 39%
+                    )
+                    17px 14px / 100% 8px no-repeat;
+
+            transform: scaleX(-1);
+            transform-origin: center;
+        }
+
+        /* =========================================================
+           CAUDA
+           ========================================================= */
+
+        .dragon__tail {
+            position: relative;
+            z-index: 4;
+
+            flex: 0 0 var(--dragon-tail-width);
+            width: var(--dragon-tail-width);
+            height: 30px;
+            margin-left: -3px;
+
+            background: currentColor;
+
+            clip-path: polygon(
+                    0% 45%,
+                    9% 43%,
+                    17% 37%,
+                    26% 36%,
+                    34% 29%,
+                    42% 36%,
+                    50% 31%,
+                    59% 38%,
+                    69% 42%,
+                    79% 50%,
+                    100% 96%,
+                    90% 70%,
+                    78% 58%,
+                    67% 54%,
+                    59% 62%,
+                    51% 55%,
+                    43% 65%,
+                    35% 57%,
+                    27% 61%,
+                    18% 54%,
+                    9% 57%,
+                    0% 54%
+            );
+        }
+    </style>
+</head>
+
+<body>
+<main class="preview">
+    <h1>Componente completo do dragão ornamental</h1>
+
+    <p>
+        O mesmo CSS atende dragões de uma, duas ou três asas. Cada
+        <code>.dragon__unit</code> contém exatamente uma asa e uma pata.
+    </p>
+
+    <section class="examples">
+        <article class="example">
+            <h2>Dragão mínimo: uma asa e uma pata</h2>
+
+            <div class="dragon-stage">
+                <div class="dragon" aria-hidden="true">
+                    <span class="dragon__head"></span>
+
+                    <span class="dragon__body">
+              <span class="dragon__unit"></span>
+            </span>
+
+                    <span class="dragon__tail"></span>
+                </div>
+            </div>
+        </article>
+
+        <article class="example">
+            <h2>Dragão intermediário: duas asas e duas patas</h2>
+
+            <div class="dragon-stage">
+                <div class="dragon" aria-hidden="true">
+                    <span class="dragon__head"></span>
+
+                    <span class="dragon__body">
+              <span class="dragon__unit"></span>
+              <span class="dragon__unit"></span>
+            </span>
+
+                    <span class="dragon__tail"></span>
+                </div>
+            </div>
+        </article>
+
+        <article class="example">
+            <h2>Dragão máximo: três asas e três patas</h2>
+
+            <div class="dragon-stage">
+                <div class="dragon" aria-hidden="true">
+                    <span class="dragon__head"></span>
+
+                    <span class="dragon__body">
+              <span class="dragon__unit"></span>
+              <span class="dragon__unit"></span>
+              <span class="dragon__unit"></span>
+            </span>
+
+                    <span class="dragon__tail"></span>
+                </div>
+            </div>
+        </article>
+
+        <article class="example">
+            <h2>Dragão máximo em direção oposta</h2>
+
+            <div class="dragon-stage">
+                <div class="dragon dragon--reverse" aria-hidden="true">
+                    <span class="dragon__head"></span>
+
+                    <span class="dragon__body">
+              <span class="dragon__unit"></span>
+              <span class="dragon__unit"></span>
+              <span class="dragon__unit"></span>
+            </span>
+
+                    <span class="dragon__tail"></span>
+                </div>
+            </div>
+        </article>
+    </section>
+</main>
+</body>
+</html>
