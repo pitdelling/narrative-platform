@@ -2,6 +2,7 @@ package com.narrativeplatform.app.aijob.repositories;
 
 import com.narrativeplatform.app.aijob.models.entities.AiJobEntity;
 import com.narrativeplatform.app.aijob.models.enums.AiJobStatusType;
+import com.narrativeplatform.app.aijob.models.enums.AiJobType;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -18,7 +19,7 @@ public interface AiJobRepository extends JpaRepository<AiJobEntity, UUID> {
     @EntityGraph(attributePaths = {"chronicle", "requestedBy"})
     List<AiJobEntity> findTop5ByStatusOrderByCreatedAtAsc(AiJobStatusType status);
 
-    boolean existsByChronicleIdAndStatusIn(UUID chronicleId, Collection<AiJobStatusType> statuses);
+    boolean existsByChronicleIdAndJobTypeAndStatusIn(UUID chronicleId, AiJobType jobType, Collection<AiJobStatusType> statuses);
 
     @EntityGraph(attributePaths = "chronicle")
     List<AiJobEntity> findAllByStatusAndStartedAtBefore(AiJobStatusType status, Instant startedAt);

@@ -5,6 +5,7 @@ import com.narrativeplatform.app.aijob.repositories.AiJobRepository;
 import com.narrativeplatform.shared.integrations.OpenAiClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.util.Pair;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -25,14 +26,14 @@ public class AiJobProcessor {
         if (!openAiClient.configured()) {
             return;
         }
-        final var jobIds = aiJobRepository.findTop5ByStatusOrderByCreatedAtAsc(AiJobStatusType.PENDING)
-                .stream()
-                .map(job -> job.getId())
-                .toList();
-        if (jobIds.isEmpty()) return;
-        log.debug("AI job sweep picked up {} pending job(s).", jobIds.size());
-        for (final var jobId : jobIds) {
-            aiJobWorker.processOne(jobId);
+        final var jobs = aiJobRepository.findTop5ByStatusOrderByCreatedAtAsc(AiJobStatusType.PENDING)
+                                        .stream()
+                                        .map(job -> Pair.of(job.getId(), job.getJobType().getModelByType()))
+                                        .toList();
+        if (jobs.isEmpty()) return;
+        log.debug("AI job sweep picked up {} pending job(s).", jobs.size());
+        for (final var job : jobs) {
+            aiJobWorker.processOne(job.getFirst(), job.getSecond());
         }
     }
 }

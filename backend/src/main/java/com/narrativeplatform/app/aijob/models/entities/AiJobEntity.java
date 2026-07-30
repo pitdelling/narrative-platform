@@ -1,6 +1,7 @@
 package com.narrativeplatform.app.aijob.models.entities;
 
 import com.narrativeplatform.app.aijob.models.enums.AiJobStatusType;
+import com.narrativeplatform.app.aijob.models.enums.AiJobType;
 import com.narrativeplatform.app.auth.models.entities.UserEntity;
 import com.narrativeplatform.app.chronicle.models.entities.ChronicleEntity;
 import jakarta.persistence.*;
@@ -35,6 +36,10 @@ public class AiJobEntity {
     @Column(nullable = false, length = 30)
     private AiJobStatusType status;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "job_type", nullable = false, length = 30)
+    private AiJobType jobType;
+
     @Column(name = "attempt_count", nullable = false)
     private int attemptCount;
 
@@ -54,10 +59,16 @@ public class AiJobEntity {
     @Column(name = "completed_at")
     private Instant completedAt;
 
-    public AiJobEntity(final ChronicleEntity chronicle, final UserEntity requestedBy, final String idempotencyKey) {
+    public AiJobEntity(
+            final ChronicleEntity chronicle,
+            final UserEntity requestedBy,
+            final String idempotencyKey,
+            final AiJobType jobType
+    ) {
         this.chronicle = chronicle;
         this.requestedBy = requestedBy;
         this.idempotencyKey = idempotencyKey;
+        this.jobType = jobType;
         this.status = AiJobStatusType.PENDING;
     }
 }

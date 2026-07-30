@@ -30,10 +30,10 @@ public class OpenAiClient {
         throw new AiNotConfiguredException();
     }
 
-    public GeneratedText generate(final String prompt) {
+    public GeneratedText generate(final String prompt, final String model) {
         requireConfigured();
         final Map<String, Object> body = Map.of(
-                "model", properties.model(),
+                "model", model,
                 "input", prompt
         );
         final var response = restClient.post()
@@ -52,7 +52,7 @@ public class OpenAiClient {
                 outputText,
                 usage.path("input_tokens").isNumber() ? usage.path("input_tokens").asInt() : null,
                 usage.path("output_tokens").isNumber() ? usage.path("output_tokens").asInt() : null,
-                properties.model()
+                model
         );
     }
 
