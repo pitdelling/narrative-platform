@@ -26,9 +26,17 @@ export function AppShell({ children, partyId }: { children: ReactNode; partyId?:
   const [confirmPassword, setConfirmPassword] = useState("");
   const [accountMessage, setAccountMessage] = useState("");
   const [accountError, setAccountError] = useState("");
+  const [partyName, setPartyName] = useState<string>();
+  const [lastPartyId, setLastPartyId] = useState(partyId);
 
   const archiveHref = partyId ? `/app/party/${partyId}` : undefined;
   const archiveActive = archiveHref ? pathname.startsWith(archiveHref) : false;
+  const groupsLabel = `Grupos${partyName ? ` - ${partyName}` : ""}`;
+
+  if (partyId !== lastPartyId) {
+    setLastPartyId(partyId);
+    setPartyName(undefined);
+  }
 
   useEffect(() => {
     let active = true;
@@ -45,6 +53,22 @@ export function AppShell({ children, partyId }: { children: ReactNode; partyId?:
       active = false;
     };
   }, [router]);
+
+  useEffect(() => {
+    if (!partyId) return;
+    let active = true;
+    void api<{ name: string }>(`/parties/${partyId}`)
+      .then((party) => {
+        if (active) setPartyName(party.name);
+      })
+      .catch(() => {
+        // Silently ignore: the group name is a nice-to-have in the nav, not worth
+        // breaking the shell or logging the user out over.
+      });
+    return () => {
+      active = false;
+    };
+  }, [partyId]);
 
   function closeMenu() {
     setMenuOpen(false);
@@ -91,11 +115,11 @@ export function AppShell({ children, partyId }: { children: ReactNode; partyId?:
           <span />
           <span />
         </button>
-        <Link className={`rail-button ${pathname === "/app" ? "active" : ""}`} href="/app" title="Todas as parties">
+        <Link className={`rail-button ${pathname === "/app" ? "active" : ""}`} href="/app" title={groupsLabel}>
           ◈
         </Link>
         {archiveHref && (
-          <Link className={`rail-button ${archiveActive ? "active" : ""}`} href={archiveHref} title="Arquivo do Cronista">
+          <Link className={`rail-button ${archiveActive ? "active" : ""}`} href={archiveHref} title="Histórias">
             ✦
           </Link>
         )}
@@ -113,8 +137,10 @@ export function AppShell({ children, partyId }: { children: ReactNode; partyId?:
         </div>
         <div className="desktop-brand"><BrandMark /></div>
         <nav>
-          <Link className={pathname === "/app" ? "active" : ""} href="/app" onClick={closeMenu}>◈ Todas as parties</Link>
-          {archiveHref && <Link className={archiveActive ? "active" : ""} href={archiveHref} onClick={closeMenu}>✦ Arquivo do Cronista</Link>}
+          <div className="nav-group">
+            <Link className={pathname === "/app" ? "active" : ""} href="/app" onClick={closeMenu}>◈ {groupsLabel}</Link>
+            {archiveHref && <Link className={`nav-subitem ${archiveActive ? "active" : ""}`} href={archiveHref} onClick={closeMenu}>✦ Histórias</Link>}
+          </div>
           <span className="disabled-nav">◌ Personagens <em>em breve</em></span>
           <span className="disabled-nav">⌖ Mapas e Linhagens <em>em breve</em></span>
           <span className="disabled-nav">▤ Biblioteca <em>em breve</em></span>
