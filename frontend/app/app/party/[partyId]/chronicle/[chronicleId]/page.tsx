@@ -120,9 +120,9 @@ function GameView({ partyId, chronicleId }: { partyId: string; chronicleId: stri
   if (!data || !party) return <p>Consultando a crônica...</p>;
 
   const finished = data.status !== "IN_PROGRESS";
-  // "Re-executar IA" is intentionally the same action as "Regenerar história": the Mapa do
-  // cânone has no AI generation of its own yet (still an honest placeholder), so there is
-  // nothing extra to re-run for it today.
+  // "Re-executar IA" only re-triggers the literary adaptation (data.status here reflects the
+  // adaptation pipeline specifically). The canon map and synopsis run independently and have
+  // no manual regeneration action in this console.
   const canRegenerate = data.narrator && ["PUBLISHED", "FAILED"].includes(data.status);
   const isRegenerating = data.narrator && ["AI_PENDING", "AI_PROCESSING"].includes(data.status);
 
@@ -189,7 +189,7 @@ function GameView({ partyId, chronicleId }: { partyId: string; chronicleId: stri
         </section>
       )}
 
-      {finished && <CanonMapPanel />}
+      {finished && <CanonMapPanel partyId={partyId} chronicleId={chronicleId} finished={finished} />}
 
       <section className="thread" aria-labelledby="thread-heading">
         <div className="section-heading">

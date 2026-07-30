@@ -2,6 +2,58 @@ export type PartyRole = "OWNER" | "NARRATOR" | "PLAYER";
 export type ChronicleType = "WRITTEN" | "GAME";
 export type ChronicleStatus = "DRAFT" | "IN_PROGRESS" | "AI_PENDING" | "AI_PROCESSING" | "PUBLISHED" | "FAILED" | "ARCHIVED";
 
+export type CanonCategory = "PERSON" | "PLACE" | "ITEM" | "SPELL" | "CREATURE";
+export type TagColor = "GOLD" | "COPPER" | "VIOLET" | "AZURE" | "GREEN" | "ROSE" | "SLATE";
+export type TagBasis = "EXPLICIT" | "INFERRED" | "CREATIVE_FILL";
+export type CanonMapStatus = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
+export type SynopsisStatus = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
+
+export interface TagSetting {
+  category: CanonCategory;
+  enabled: boolean;
+  color: TagColor;
+  displayOrder: number;
+}
+
+export interface CanonTag {
+  id: string;
+  name: string;
+  summary: string;
+  visualDescription: string;
+  personalityDescription?: string;
+  visualBasis: TagBasis;
+  personalityBasis?: TagBasis;
+  sourceSegmentPositions: number[];
+}
+
+export interface CanonCategorySection {
+  category: CanonCategory;
+  enabled: boolean;
+  color: TagColor;
+  displayOrder: number;
+  tags: CanonTag[];
+}
+
+export interface CanonMap {
+  status: CanonMapStatus;
+  completedAt?: string;
+  errorMessage?: string;
+  categories: CanonCategorySection[];
+}
+
+export interface ChronicleSynopsis {
+  status: SynopsisStatus;
+  content?: string;
+  completedAt?: string;
+  errorMessage?: string;
+}
+
+export interface AiArtifacts {
+  aiConfigured: boolean;
+  canonMap?: CanonMap;
+  synopsis?: ChronicleSynopsis;
+}
+
 export interface AuthResponse {
   token: string;
   userId: string;

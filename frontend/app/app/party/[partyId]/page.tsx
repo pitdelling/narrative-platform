@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import type { ChronicleCard, PartyDetail, PartyInvitationLink, PartyMember, PartyRole } from "@/lib/types";
 import { AppShell } from "@/components/AppShell";
+import { AiTagSettingsPanel } from "@/components/chronicle/AiTagSettingsPanel";
 import { GameProgressBar } from "@/components/chronicle/GameProgressBar";
 import { WhatsAppIcon } from "@/components/WhatsAppIcon";
 
@@ -243,6 +244,8 @@ export default function PartyArchivePage() {
           </div>
         </details>
       )}
+
+      {narrator && <AiTagSettingsPanel partyId={partyId} narrator={narrator} />}
 
       {showCreate && (
         <form className="create-chronicle card" onSubmit={create}>
