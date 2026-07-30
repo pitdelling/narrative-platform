@@ -33,8 +33,10 @@ function buildDragon(units: number): HTMLDivElement {
   return dragon;
 }
 
-function distributeRow(row: HTMLElement, availableWidth: number, metrics: DragonMetrics) {
-  const fragment = document.createDocumentFragment();
+function buildRow(index: number, availableWidth: number, metrics: DragonMetrics): HTMLDivElement {
+  const row = document.createElement("div");
+  row.className = index % 2 === 0 ? "dragon-row" : "dragon-row dragon-row--reverse";
+
   let remaining = availableWidth;
   let hasDragon = false;
 
@@ -45,12 +47,12 @@ function distributeRow(row: HTMLElement, availableWidth: number, metrics: Dragon
     }
     const units = Math.min(3, Math.floor((remaining - metrics.fixed) / metrics.unit));
     if (units < 1) break;
-    fragment.appendChild(buildDragon(units));
+    row.appendChild(buildDragon(units));
     remaining -= metrics.fixed + units * metrics.unit;
     hasDragon = true;
   }
 
-  row.replaceChildren(fragment);
+  return row;
 }
 
 export function DragonPanel() {
@@ -60,7 +62,6 @@ export function DragonPanel() {
     const inner = innerRef.current;
     if (!inner) return;
 
-    const rows = Array.from(inner.querySelectorAll<HTMLElement>(".dragon-row"));
     let frame = 0;
 
     function recalculate() {
@@ -70,10 +71,19 @@ export function DragonPanel() {
       const tailWidth = parseFloat(styles.getPropertyValue("--dragon-tail-width"));
       const unitWidth = parseFloat(styles.getPropertyValue("--dragon-unit-width"));
       const gap = parseFloat(styles.getPropertyValue("--dragon-gap"));
+      const rowHeight = parseFloat(styles.getPropertyValue("--dragon-row-height"));
+      const rowGap = parseFloat(styles.getPropertyValue("--dragon-row-gap"));
       const fixed = headWidth + tailWidth;
       const metrics: DragonMetrics = { fixed, unit: unitWidth, gap, minimum: fixed + unitWidth };
-      const availableWidth = inner.getBoundingClientRect().width;
-      rows.forEach((row) => distributeRow(row, availableWidth, metrics));
+
+      const { width: availableWidth, height: availableHeight } = inner.getBoundingClientRect();
+      const rowCount = Math.max(0, Math.floor((availableHeight + rowGap) / (rowHeight + rowGap)));
+
+      const fragment = document.createDocumentFragment();
+      for (let index = 0; index < rowCount; index += 1) {
+        fragment.appendChild(buildRow(index, availableWidth, metrics));
+      }
+      inner.replaceChildren(fragment);
     }
 
     const observer = new ResizeObserver(() => {
@@ -91,12 +101,7 @@ export function DragonPanel() {
 
   return (
     <div className="dragon-panel" aria-hidden="true">
-      <div className="dragon-panel__inner" ref={innerRef}>
-        <div className="dragon-row" />
-        <div className="dragon-row dragon-row--reverse" />
-        <div className="dragon-row" />
-        <div className="dragon-row dragon-row--reverse" />
-      </div>
+      <div className="dragon-panel__inner" ref={innerRef} />
     </div>
   );
 }

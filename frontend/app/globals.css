@@ -91,6 +91,7 @@
   --dragon-tail-width: 76px;
   --dragon-gap: 25px;
   --dragon-row-height: 64px;
+  --dragon-row-gap: 36px;
   --dragon-bleed: 250px;
 }
 * { box-sizing: border-box; }
@@ -199,13 +200,33 @@ textarea { resize: vertical; line-height: 1.65; }
 @media (min-width: 1300px) {
   .dragon-panel { display: flex; flex: 1; min-width: 0; position: relative; overflow: hidden; color: rgba(var(--gold-rgb),.48); }
 
+  /* Ornamental frame: fading gold rules on all four edges, each with a small center flourish.
+     Sizes are percentages of the panel's own box, so the side rules stay proportional no matter
+     how tall the panel gets (it tracks the generated story's height). */
+  .dragon-panel::before {
+    content: ""; position: absolute; inset: 0; z-index: 5; pointer-events: none;
+    background:
+      linear-gradient(90deg, transparent, rgba(var(--gold-rgb),.4) 20%, rgba(var(--gold-rgb),.4) 80%, transparent) top / 88% 1px no-repeat,
+      linear-gradient(90deg, transparent, rgba(var(--gold-rgb),.4) 20%, rgba(var(--gold-rgb),.4) 80%, transparent) bottom / 88% 1px no-repeat,
+      radial-gradient(circle, rgba(var(--gold-rgb),.75) 0 2px, transparent 3px) top / 9px 9px no-repeat,
+      radial-gradient(circle, rgba(var(--gold-rgb),.75) 0 2px, transparent 3px) bottom / 9px 9px no-repeat;
+  }
+  .dragon-panel::after {
+    content: ""; position: absolute; inset: 0; z-index: 5; pointer-events: none;
+    background:
+      linear-gradient(180deg, transparent, rgba(var(--gold-rgb),.3) 12%, rgba(var(--gold-rgb),.3) 88%, transparent) left / 1px 92% no-repeat,
+      linear-gradient(180deg, transparent, rgba(var(--gold-rgb),.3) 12%, rgba(var(--gold-rgb),.3) 88%, transparent) right / 1px 92% no-repeat,
+      radial-gradient(circle, rgba(var(--gold-rgb),.75) 0 2px, transparent 3px) left / 9px 9px no-repeat,
+      radial-gradient(circle, rgba(var(--gold-rgb),.75) 0 2px, transparent 3px) right / 9px 9px no-repeat;
+  }
+
   .dragon-panel__inner {
     position: relative;
     left: calc(var(--dragon-bleed) * -1);
     width: calc(100% + var(--dragon-bleed) * 2);
     min-width: calc(var(--dragon-head-width) + var(--dragon-tail-width) + var(--dragon-unit-width) + var(--dragon-bleed) * 2);
     height: 100%;
-    display: flex; flex-direction: column; justify-content: space-between;
+    display: flex; flex-direction: column; justify-content: center; gap: var(--dragon-row-gap);
   }
 
   .dragon-row { display: flex; align-items: center; gap: var(--dragon-gap); height: var(--dragon-row-height); }
