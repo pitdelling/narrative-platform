@@ -1,11 +1,12 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import type { ChronicleCard, PartyDetail, PartyInvitationLink, PartyMember, PartyRole } from "@/lib/types";
 import { AppShell } from "@/components/AppShell";
+import { GameProgressBar } from "@/components/chronicle/GameProgressBar";
 import { WhatsAppIcon } from "@/components/WhatsAppIcon";
 
 const roleLabels: Record<PartyRole, string> = {
@@ -19,6 +20,16 @@ const statusLabels: Record<PartyMember["status"], string> = {
   DISABLED: "Desabilitado temporariamente",
   REMOVED: "Removido",
 };
+
+function compareChronicles(a: ChronicleCard, b: ChronicleCard): number {
+  if (a.published !== b.published) return a.published ? 1 : -1;
+  if (!a.published) {
+    const awaitingDiff = Number(b.awaitingCurrentUser ?? false) - Number(a.awaitingCurrentUser ?? false);
+    if (awaitingDiff !== 0) return awaitingDiff;
+    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+  }
+  return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+}
 
 export default function PartyArchivePage() {
   const { partyId } = useParams<{ partyId: string }>();
@@ -38,6 +49,7 @@ export default function PartyArchivePage() {
   const [message, setMessage] = useState("");
   const narrator = party?.currentUserRole === "OWNER" || party?.currentUserRole === "NARRATOR";
   const owner = party?.currentUserRole === "OWNER";
+  const sortedChronicles = useMemo(() => [...chronicles].sort(compareChronicles), [chronicles]);
 
   const load = useCallback(async () => {
     const [partyDetail, chronicleCards] = await Promise.all([
@@ -131,10 +143,10 @@ export default function PartyArchivePage() {
 
   return (
     <AppShell partyId={partyId}>
-      <Link className="back-link" href="/app">← Todas as parties</Link>
+      <Link className="back-link" href="/app">← Grupos</Link>
       <header className="page-header archive-header">
         <div>
-          <p className="eyebrow">Arquivo do Cronista</p>
+          <p className="eyebrow">Histórias</p>
           <h1>{party?.name ?? "Carregando..."}</h1>
           <p>Memórias, relatos e verdades registradas pela party.</p>
         </div>
@@ -280,7 +292,9 @@ export default function PartyArchivePage() {
       )}
 
       <section className="chronicle-grid">
-        {chronicles.map((item, index) => (
+        {sortedChronicles.map((item, index) => {
+          const hasProgress = item.type === "GAME" && item.status === "IN_PROGRESS" && typeof item.totalTurns === "number";
+          return (
           <Link
             href={`/app/party/${partyId}/chronicle/${item.id}?type=${item.type}`}
             key={item.id}
@@ -288,15 +302,22 @@ export default function PartyArchivePage() {
           >
             <div className={`chronicle-art art-${index % 4}`}><span>{item.status === "PUBLISHED" ? "✦" : "◌"}</span></div>
             <div className="chronicle-copy">
+              {hasProgress && (
+                <div className="card-progress-row">
+                  <GameProgressBar completed={item.completedTurns ?? 0} total={item.totalTurns as number} />
+                  <span className={`status-pill status-${item.status.toLowerCase()}`}>{item.status.replaceAll("_", " ")}</span>
+                </div>
+              )}
               <div className="card-heading">
                 <h2>{item.title}</h2>
-                <span className={`status-pill status-${item.status.toLowerCase()}`}>{item.status.replaceAll("_", " ")}</span>
+                {!hasProgress && <span className={`status-pill status-${item.status.toLowerCase()}`}>{item.status.replaceAll("_", " ")}</span>}
               </div>
               <p>{item.preview || (item.status === "IN_PROGRESS" ? "Uma história ainda está sendo construída. Os trechos permanecem velados." : "Este registro ainda não possui uma versão publicada.")}</p>
               <small>Criado por {item.creatorName}</small>
             </div>
           </Link>
-        ))}
+          );
+        })}
         {chronicles.length === 0 && (
           <div className="empty-state card">
             <span>✦</span>
