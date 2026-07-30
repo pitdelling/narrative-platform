@@ -11,6 +11,7 @@ import com.narrativeplatform.app.chronicle.repositories.GameRunRepository;
 import com.narrativeplatform.app.chronicle.repositories.GameSegmentRepository;
 import com.narrativeplatform.app.chronicle.repositories.GeneratedStoryRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +20,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AiJobStateService {
@@ -37,12 +39,14 @@ public class AiJobStateService {
     public void recoverStaleJobs() {
         final var cutoff = Instant.now().minus(STALE_PROCESSING_MINUTES, ChronoUnit.MINUTES);
         final var staleJobs = aiJobRepository.findAllByStatusAndStartedAtBefore(AiJobStatusType.PROCESSING, cutoff);
+        if (!staleJobs.isEmpty()) log.debug("Recovering {} stale AI job(s).", staleJobs.size());
         for (final var job : staleJobs) {
             if (job.getAttemptCount() >= MAX_ATTEMPTS) {
                 job.setStatus(AiJobStatusType.FAILED);
                 job.getChronicle().setStatus(ChronicleStatusType.FAILED);
                 job.setCompletedAt(Instant.now());
                 job.setErrorMessage("AI processing was interrupted too many times.");
+                log.warn("AI job {} for chronicle {} failed permanently after too many stale interruptions.", job.getId(), job.getChronicle().getId());
                 continue;
             }
             job.setStatus(AiJobStatusType.PENDING);
@@ -62,6 +66,7 @@ public class AiJobStateService {
         job.setStartedAt(Instant.now());
         job.setAttemptCount(job.getAttemptCount() + 1);
         job.getChronicle().setStatus(ChronicleStatusType.AI_PROCESSING);
+        log.debug("Claimed AI job {} for chronicle {} (attempt {}).", job.getId(), job.getChronicle().getId(), job.getAttemptCount());
 
         final var run = gameRunRepository.findByChronicleId(job.getChronicle().getId())
                 .orElseThrow(() -> new IllegalStateException("Game run not found."));
@@ -101,6 +106,7 @@ public class AiJobStateService {
         job.setStatus(AiJobStatusType.COMPLETED);
         job.setCompletedAt(Instant.now());
         job.setErrorMessage(null);
+        log.info("AI job {} completed for chronicle {}, generated story version {}.", job.getId(), chronicle.getId(), version);
     }
 
     @Transactional
@@ -114,10 +120,12 @@ public class AiJobStateService {
             job.setStatus(AiJobStatusType.FAILED);
             job.getChronicle().setStatus(ChronicleStatusType.FAILED);
             job.setCompletedAt(Instant.now());
+            log.warn("AI job {} for chronicle {} failed permanently after {} attempt(s): {}", job.getId(), job.getChronicle().getId(), job.getAttemptCount(), errorMessage);
             return;
         }
         job.setStatus(AiJobStatusType.PENDING);
         job.getChronicle().setStatus(ChronicleStatusType.AI_PENDING);
+        log.debug("AI job {} for chronicle {} failed attempt {}, will retry: {}", job.getId(), job.getChronicle().getId(), job.getAttemptCount(), errorMessage);
     }
 
     private String buildPrompt(

@@ -9,12 +9,14 @@ import com.narrativeplatform.app.chronicle.models.enums.ChronicleStatusType;
 import com.narrativeplatform.shared.exceptions.ConflictException;
 import com.narrativeplatform.shared.integrations.OpenAiClient;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Set;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AiJobService {
@@ -40,10 +42,12 @@ public class AiJobService {
 
     private void enqueueInternal(final ChronicleEntity chronicle, final UserEntity requestedBy) {
         if (aiJobRepository.existsByChronicleIdAndStatusIn(chronicle.getId(), ACTIVE_STATUSES)) {
+            log.debug("Rejected AI job enqueue for chronicle {}: a job is already active.", chronicle.getId());
             throw new ConflictException("An AI generation is already pending for this chronicle.");
         }
         final var idempotencyKey = chronicle.getId() + IDEMPOTENCY_KEY_SEPARATOR + UUID.randomUUID();
         aiJobRepository.save(new AiJobEntity(chronicle, requestedBy, idempotencyKey));
         chronicle.setStatus(ChronicleStatusType.AI_PENDING);
+        log.debug("Enqueued AI job for chronicle {} requested by user {}.", chronicle.getId(), requestedBy.getId());
     }
 }

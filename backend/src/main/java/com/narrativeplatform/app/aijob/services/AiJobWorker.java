@@ -3,12 +3,14 @@ package com.narrativeplatform.app.aijob.services;
 import com.narrativeplatform.app.aijob.models.commands.AiGenerationResult;
 import com.narrativeplatform.shared.integrations.OpenAiClient;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AiJobWorker {
@@ -22,6 +24,7 @@ public class AiJobWorker {
             return;
         }
         try {
+            log.debug("Requesting AI generation for job {} (chronicle {}).", jobId, command.chronicleId());
             final var generated = openAiClient.generate(command.prompt());
             final var parsed = parseGeneratedText(generated.text(), command.fallbackTitle());
             aiJobStateService.complete(jobId, new AiGenerationResult(
@@ -32,6 +35,7 @@ public class AiJobWorker {
                     generated.outputTokens()
             ));
         } catch (final RuntimeException exception) {
+            log.warn("AI generation failed for job {}: {}", jobId, exception.getMessage());
             aiJobStateService.fail(jobId, exception.getMessage());
         }
     }
