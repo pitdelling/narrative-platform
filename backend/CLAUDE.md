@@ -112,15 +112,34 @@ Override of the generic parent mapper rule:
 - Do not expose disabled users' protected content.
 - Invitation tokens are never logged and never appear in error messages; exception messages on the resolution path stay generic (e.g. `"Invitation not found."`).
 
+## Logging
+
+- Use Lombok `@Slf4j` for logging (already the pattern in `GlobalExceptionHandler`); never use `System.out`/`System.err`.
+- Key business flows (turn/run lifecycle in `GameChronicleService`, AI job lifecycle in `AiJobService`/`AiJobStateService`/`AiJobProcessor`/`AiJobWorker`) log at `debug`/`info` for normal flow and `warn`/`error` for failures. Never log secrets, tokens, or full request bodies.
+- Production `application.yml` has no `logging.level` override, so these stay silent by default (Spring Boot's default root level is `INFO`, and none of the above use `info` for routine per-request noise).
+- To see them locally, set `logging.level.com.narrativeplatform: DEBUG` in `application-local.yml` (already the developer's personal, git-ignored local profile — the line is present there by default) or export `LOGGING_LEVEL_COM_NARRATIVEPLATFORM=DEBUG` for any other environment.
+
 ## Build & Run
 
-Never suggest or run Maven or Java CLI commands. The developer uses IntelliJ IDEA:
+The developer's day-to-day workflow is IntelliJ IDEA:
 
 - Maven panel → Lifecycle → clean/test/package.
 - Build → Build Project.
 - Run `NarrativePlatformApplication` through an IntelliJ Spring Boot run configuration.
 
-Docker and hosting configuration may use Maven internally during remote builds; this restriction applies to local development instructions and Claude execution.
+For Claude Code console sessions, the developer has no globally-installed JDK or Maven. Portable, version-pinned toolchains are staged under `C:\Users\Philip Delling\.raftech\develop\` and must be used instead of installing anything system-wide:
+
+- `develop\jdks\<name>` — portable JDKs, one folder per version (e.g. `jdk-21.0.8`, which matches this project's required Java 21). IntelliJ itself already uses this same folder as its JDK cache.
+- `develop\mvns\mvn-<version>` — portable Maven distributions, one folder per version (e.g. `mvn-3.9.11`, matching the version pinned in `backend/Dockerfile`'s build stage).
+
+Rules for using this toolchain:
+
+- Never install a JDK/Maven system-wide and never modify the system or user `PATH`/`JAVA_HOME` permanently. Set `JAVA_HOME` and prepend the chosen Maven's `bin` directory to `PATH` for a single terminal session only, or invoke the executables by their full path directly.
+- If the JDK or Maven version a task needs is not already present under `develop\jdks\` or `develop\mvns\`, stop and ask the user which version to fetch — never download one silently.
+- **Always ask the user for confirmation before actually running any `mvn`/`java` command — including read-only ones like `mvn -v` — even when operating in auto-mode.** This is a hard exception to auto-mode's normal bias toward proceeding without stopping.
+- This portable toolchain may be used both to run the test suite and to start the application locally when a console genuinely needs to execute or verify backend behavior, not just read the code — subject to the confirmation rule above.
+
+Docker and hosting configuration may use Maven internally during remote builds; that is unaffected by any of the above.
 
 ## Documentation Maintenance
 
