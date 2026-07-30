@@ -8,3 +8,4 @@ frontend/.next/
 frontend/node_modules/
 frontend/next-env.d.ts
 frontend/tsconfig.tsbuildinfo
+frontend/app/dev-preview/

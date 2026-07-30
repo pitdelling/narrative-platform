@@ -9,7 +9,7 @@
 | Instalar e executar o frontend | 10–20 min |
 | Testar convites, turnos e bloqueios | 30–60 min |
 | Enviar ao GitHub | 5–15 min |
-| Publicar Render + Vercel | 20–40 min |
+| Publicar Cloudflare Tunnel + Vercel | 20–40 min |
 
 Na primeira configuração, reserve aproximadamente **1h30 a 3h**. Depois disso, novos deploys são automáticos pelo GitHub.
 
@@ -140,24 +140,35 @@ git push -u origin main
 
 Confirme no GitHub que nenhum `.env.local`, senha de banco, JWT secret ou chave de API foi enviado.
 
-## 9. Publicar o backend gratuitamente no Render
+## 9. Publicar o backend através de Cloudflare Tunnel
 
-1. Envie o repositório ao GitHub.
-2. No Render, escolha **New > Web Service**.
-3. Conecte o repositório.
-4. Defina `Root Directory` como `backend`.
-5. Escolha o runtime Docker; o `Dockerfile` será detectado.
-6. Escolha a instância Free.
-7. Cadastre as mesmas variáveis do backend, alterando:
+O backend não é hospedado em uma plataforma gerenciada (não usamos mais Render). Ele roda onde você decidir (servidor próprio, VPS etc.) e é exposto publicamente por um túnel Cloudflare (`cloudflared`), sem expor a porta diretamente.
+
+1. Rode o backend normalmente (pelo IntelliJ, ou via o `backend/Dockerfile` empacotado) na máquina/servidor escolhido, escutando na porta `8080`.
+2. Instale o `cloudflared` nessa máquina e autentique-o na sua conta Cloudflare (`cloudflared tunnel login`).
+3. Crie um túnel nomeado (`cloudflared tunnel create SEU-TUNEL`) e associe um hostname público a ele (`cloudflared tunnel route dns SEU-TUNEL api.seudominio.com`).
+4. Configure o túnel para apontar para o backend local, por exemplo em `~/.cloudflared/config.yml`:
+
+```yaml
+tunnel: SEU-TUNEL
+credentials-file: /caminho/para/SEU-TUNEL.json
+ingress:
+  - hostname: api.seudominio.com
+    service: http://localhost:8080
+  - service: http_status:404
+```
+
+5. Rode o túnel (`cloudflared tunnel run SEU-TUNEL`), ou instale-o como serviço do sistema operacional para manter ativo entre reinícios.
+6. Cadastre as variáveis de ambiente do backend com o domínio público do túnel:
 
 ```text
 FRONTEND_URL=https://SEU-FRONTEND.vercel.app
 APP_PUBLIC_URL=https://SEU-FRONTEND.vercel.app
 ```
 
-8. Faça o deploy e copie a URL pública do backend.
+7. Copie a URL pública do backend (o hostname configurado no túnel, ex.: `https://api.seudominio.com`).
 
-A instância gratuita do Render pode hibernar após inatividade. A primeira requisição depois disso pode demorar aproximadamente um minuto.
+Diferente de uma instância gratuita de PaaS, o backend atrás do túnel não hiberna por inatividade — a disponibilidade depende apenas da máquina onde ele roda e do próprio `cloudflared` estarem ativos.
 
 ## 10. Publicar o frontend gratuitamente na Vercel
 
@@ -167,12 +178,12 @@ A instância gratuita do Render pode hibernar após inatividade. A primeira requ
 4. Configure:
 
 ```text
-NEXT_PUBLIC_API_URL=https://SEU-BACKEND.onrender.com/api
+NEXT_PUBLIC_API_URL=https://api.seudominio.com/api
 NEXT_PUBLIC_APP_NAME=Narrative Platform
 ```
 
 5. Faça o deploy.
-6. Volte ao Render e atualize `FRONTEND_URL` e `APP_PUBLIC_URL` com a URL final da Vercel.
+6. Atualize `FRONTEND_URL` e `APP_PUBLIC_URL` (variáveis do backend, passo 6 da seção 9) com a URL final da Vercel.
 
 ## 11. OpenAI
 
@@ -187,13 +198,13 @@ Cada party tem um único link de convite reutilizável, visível e regenerável 
 
 ## 13. Checklist depois do deploy
 
-1. Abra `https://SEU-BACKEND.onrender.com/actuator/health` e aguarde até retornar `UP`.
+1. Abra `https://api.seudominio.com/actuator/health` (hostname do seu túnel Cloudflare) e aguarde até retornar `UP`.
 2. Abra o frontend da Vercel e registre uma conta de narrador.
 3. Crie uma party e um convite individual.
 4. Abra o convite em uma janela anônima e crie o primeiro jogador.
-5. Confirme no Render que `FRONTEND_URL` corresponde exatamente ao domínio da Vercel, sem barra final.
-6. Confirme que a chave OpenAI existe apenas no Render.
-7. Se o primeiro acesso ao backend demorar, aguarde o serviço gratuito acordar e tente novamente.
+5. Confirme, nas variáveis de ambiente do backend, que `FRONTEND_URL` corresponde exatamente ao domínio da Vercel, sem barra final.
+6. Confirme que a chave OpenAI existe apenas no ambiente do backend, nunca no frontend.
+7. Confirme que o `cloudflared` está ativo (como serviço do sistema) na máquina do backend, para que o túnel sobreviva a reinícios.
 
 ## 14. Atualizações futuras
 
@@ -202,7 +213,7 @@ Depois de qualquer alteração:
 1. Teste o backend pelo IntelliJ.
 2. Execute `npm run lint` e `npm run build` no frontend.
 3. Faça commit e `git push`.
-4. Vercel e Render criarão novos deploys automaticamente.
+4. A Vercel cria um novo deploy do frontend automaticamente. O backend, por não estar em uma plataforma gerenciada, precisa ser reiniciado manualmente (ou pelo processo/serviço que você configurou) na máquina onde roda; o túnel Cloudflare não precisa ser reconfigurado, pois continua apontando para a mesma porta local.
 
 ## Checklist das melhorias de navegação e fluxo
 
