@@ -2,6 +2,7 @@ package com.narrativeplatform.app.chronicle.models.responses;
 
 import com.narrativeplatform.app.chronicle.models.enums.ChronicleStatusType;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -9,6 +10,9 @@ public record GameChronicleDetailResponse(
         UUID id,
         String title,
         ChronicleStatusType status,
+        String creatorName,
+        Instant createdAt,
+        Instant completedAt,
         short cycleCount,
         int currentSequence,
         int totalTurns,
