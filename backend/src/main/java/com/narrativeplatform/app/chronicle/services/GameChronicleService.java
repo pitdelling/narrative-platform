@@ -1,6 +1,7 @@
 package com.narrativeplatform.app.chronicle.services;
 
 import com.narrativeplatform.app.aijob.services.AiJobService;
+import com.narrativeplatform.app.canon.services.CanonMapGenerationService;
 import com.narrativeplatform.app.auth.models.entities.UserEntity;
 import com.narrativeplatform.app.auth.repositories.UserRepository;
 import com.narrativeplatform.app.chronicle.models.entities.*;
@@ -50,6 +51,8 @@ public class GameChronicleService {
     private final CurrentUserService currentUserService;
     private final AppProperties properties;
     private final AiJobService aiJobService;
+    private final CanonMapGenerationService canonMapGenerationService;
+    private final ChronicleSynopsisService chronicleSynopsisService;
 
     @Transactional
     public UUID create(final UUID partyId, final CreateGameChronicleRequest request) {
@@ -338,8 +341,10 @@ public class GameChronicleService {
         run.setCompletedAt(Instant.now());
         final var chronicle = run.getChronicle();
         chronicle.setStatus(ChronicleStatusType.AI_PENDING);
-        log.info("Game chronicle {} completed; queued initial AI generation.", chronicle.getId());
+        log.info("Game chronicle {} completed; queued the AI artifact pipeline.", chronicle.getId());
         aiJobService.enqueue(chronicle, chronicle.getCreator());
+        canonMapGenerationService.enqueueGeneration(chronicle);
+        chronicleSynopsisService.enqueueGeneration(chronicle);
     }
 
     private void insertIntoRun(final ChronicleEntity chronicle, final UserEntity user) {

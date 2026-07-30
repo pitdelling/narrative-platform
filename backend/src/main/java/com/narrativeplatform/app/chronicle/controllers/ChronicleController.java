@@ -2,6 +2,7 @@ package com.narrativeplatform.app.chronicle.controllers;
 
 import com.narrativeplatform.app.chronicle.models.requests.*;
 import com.narrativeplatform.app.chronicle.models.responses.*;
+import com.narrativeplatform.app.chronicle.services.AiArtifactsQueryService;
 import com.narrativeplatform.app.chronicle.services.ChronicleService;
 import com.narrativeplatform.app.chronicle.services.GameChronicleService;
 import com.narrativeplatform.app.chronicle.services.WrittenChronicleService;
@@ -21,6 +22,7 @@ public class ChronicleController {
     private final ChronicleService chronicleService;
     private final GameChronicleService gameChronicleService;
     private final WrittenChronicleService writtenChronicleService;
+    private final AiArtifactsQueryService aiArtifactsQueryService;
 
     @GetMapping
     List<ChronicleCardResponse> list(@PathVariable("partyId") final UUID partyId) {
@@ -122,6 +124,14 @@ public class ChronicleController {
             @PathVariable("segmentId") final UUID segmentId
     ) {
         gameChronicleService.restoreSegment(partyId, chronicleId, segmentId);
+    }
+
+    @GetMapping("/{chronicleId}/ai-artifacts")
+    AiArtifactsResponse aiArtifacts(
+            @PathVariable("partyId") final UUID partyId,
+            @PathVariable("chronicleId") final UUID chronicleId
+    ) {
+        return aiArtifactsQueryService.get(partyId, chronicleId);
     }
 
     @GetMapping("/{chronicleId}/generated-stories")

@@ -54,6 +54,14 @@ public class ChronicleEntity {
     @ToString.Exclude
     private GeneratedStoryEntity currentGeneratedStory;
 
+    @Column(length = 240)
+    private String synopsis;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "current_synopsis_id")
+    @ToString.Exclude
+    private ChronicleSynopsisEntity currentSynopsis;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -73,8 +81,9 @@ public class ChronicleEntity {
     private long version;
 
     public ChronicleCardResponse toCardResponse(final Integer completedTurns, final Integer totalTurns, final Boolean awaitingCurrentUser) {
+        final var preview = status == ChronicleStatusType.PUBLISHED && synopsis != null ? synopsis : generatedPreview;
         return new ChronicleCardResponse(
-                id, type, status, title, generatedPreview, creator.getDisplayName(), createdAt, updatedAt,
+                id, type, status, title, preview, creator.getDisplayName(), createdAt, updatedAt,
                 status == ChronicleStatusType.PUBLISHED, completedTurns, totalTurns, awaitingCurrentUser
         );
     }
