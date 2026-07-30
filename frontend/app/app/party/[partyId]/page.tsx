@@ -6,8 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import type { ChronicleCard, PartyDetail, PartyInvitationLink, PartyMember, PartyRole } from "@/lib/types";
 import { AppShell } from "@/components/AppShell";
-
-const INVITE_HINT = "Por ordem do Narrador, o bardo espalhou este link pelas tabernas do reino.";
+import { WhatsAppIcon } from "@/components/WhatsAppIcon";
 
 const roleLabels: Record<PartyRole, string> = {
   OWNER: "Proprietário",
@@ -33,7 +32,7 @@ export default function PartyArchivePage() {
   const [cycles, setCycles] = useState(1);
   const [editors, setEditors] = useState<string[]>([]);
   const [invitation, setInvitation] = useState<PartyInvitationLink>();
-  const [copyFeedback, setCopyFeedback] = useState("");
+  const [membersCopyFeedback, setMembersCopyFeedback] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [inviteError, setInviteError] = useState("");
   const [message, setMessage] = useState("");
@@ -80,11 +79,24 @@ export default function PartyArchivePage() {
     }
   }
 
-  async function copyInviteLink() {
-    if (!invitation) return;
-    await navigator.clipboard.writeText(invitation.inviteUrl);
-    setCopyFeedback("Copiado!");
-    window.setTimeout(() => setCopyFeedback(""), 2000);
+  function buildInviteMessage() {
+    if (!party || !invitation) return "";
+    const appName = process.env.NEXT_PUBLIC_APP_NAME ?? "Narrative Platform";
+    return `Por ordem de um Narrador, o bardo do reino convida você para a party "${party.name}" no reino de "${appName}". Para participar, basta apresentar o seu convite: ${invitation.inviteUrl}!`;
+  }
+
+  async function copyInviteMessage() {
+    const inviteMessage = buildInviteMessage();
+    if (!inviteMessage) return;
+    await navigator.clipboard.writeText(inviteMessage);
+    setMembersCopyFeedback(true);
+    window.setTimeout(() => setMembersCopyFeedback(false), 2000);
+  }
+
+  function sendInviteWhatsApp() {
+    const inviteMessage = buildInviteMessage();
+    if (!inviteMessage) return;
+    window.open(`https://wa.me/?text=${encodeURIComponent(inviteMessage)}`, "_blank", "noopener,noreferrer");
   }
 
   async function regenerateLink() {
@@ -127,24 +139,51 @@ export default function PartyArchivePage() {
           <p>Memórias, relatos e verdades registradas pela party.</p>
         </div>
         <div className="header-top">
-          {narrator && invitation && (
-            <div className="invite-chip">
-              <span className="invite-chip-hint">{INVITE_HINT}</span>
-              <div className="invite-chip-row">
-                <code className="invite-chip-url" title={invitation.inviteUrl}>{invitation.inviteUrl}</code>
-                <button className="button ghost" onClick={copyInviteLink}>{copyFeedback || "Copiar link"}</button>
-              </div>
-              <button className="text-button invite-chip-regenerate" onClick={regenerateLink} disabled={regenerating}>
-                {regenerating ? "Gerando..." : "Gerar novo link"}
-              </button>
-              {inviteError && <small className="invite-chip-error">{inviteError}</small>}
-            </div>
-          )}
           <div className="header-actions">
             <button className="button primary" onClick={() => setShowCreate(!showCreate)}>✎ Registrar crônica</button>
           </div>
         </div>
       </header>
+
+      {narrator && invitation && party && (
+        <div className="invite-members-panel card">
+          <div className="invite-members-row">
+            <span className="invite-members-label">Convite para Membros:</span>
+            <code className="invite-members-url" title={invitation.inviteUrl}>{invitation.inviteUrl}</code>
+            <div className="invite-members-actions">
+              <button
+                type="button"
+                className="invite-icon-button"
+                title={regenerating ? "Gerando novo link..." : "Gerar novo link"}
+                aria-label="Gerar novo link"
+                onClick={regenerateLink}
+                disabled={regenerating}
+              >
+                ↻
+              </button>
+              <button
+                type="button"
+                className="invite-icon-button"
+                title={membersCopyFeedback ? "Copiado!" : "Copiar convite"}
+                aria-label="Copiar convite"
+                onClick={copyInviteMessage}
+              >
+                {membersCopyFeedback ? "✓" : "⧉"}
+              </button>
+              <button
+                type="button"
+                className="invite-icon-button"
+                title="Enviar convite pelo WhatsApp"
+                aria-label="Enviar convite pelo WhatsApp"
+                onClick={sendInviteWhatsApp}
+              >
+                <WhatsAppIcon />
+              </button>
+            </div>
+          </div>
+          {inviteError && <small className="invite-members-error">{inviteError}</small>}
+        </div>
+      )}
 
       {narrator && party && (
         <details className="members-panel card">
