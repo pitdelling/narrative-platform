@@ -18,6 +18,7 @@ import com.narrativeplatform.app.chronicle.models.entities.GameSegmentEntity;
 import com.narrativeplatform.app.chronicle.models.enums.SegmentStatusType;
 import com.narrativeplatform.app.chronicle.repositories.GameRunRepository;
 import com.narrativeplatform.app.chronicle.repositories.GameSegmentRepository;
+import com.narrativeplatform.shared.utils.RichTextSanitizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -92,7 +93,7 @@ public class CanonMapJobHandler implements AiJobTypeHandler {
             builder.append("\n[Position ").append(segment.getSequenceNumber())
                     .append(" | Cycle ").append(segment.getCycleNumber())
                     .append(" | ").append(segment.getAuthor().getDisplayName()).append("]\n")
-                    .append(segment.getContent()).append("\n");
+                    .append(RichTextSanitizer.toPlainText(segment.getContent())).append("\n");
         }
         return builder.toString();
     }

@@ -21,6 +21,7 @@ import com.narrativeplatform.shared.exceptions.ConflictException;
 import com.narrativeplatform.shared.exceptions.ForbiddenException;
 import com.narrativeplatform.shared.exceptions.NotFoundException;
 import com.narrativeplatform.shared.exceptions.TurnExpiredException;
+import com.narrativeplatform.shared.utils.RichTextSanitizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -90,7 +91,7 @@ public class GameChronicleService {
         openingTurn.setStartedAt(startedAt);
         openingTurn.setSubmittedAt(startedAt);
         gameTurnRepository.saveAll(turns);
-        gameSegmentRepository.save(new GameSegmentEntity(openingTurn, request.initialContent().trim()));
+        gameSegmentRepository.save(new GameSegmentEntity(openingTurn, RichTextSanitizer.sanitize(request.initialContent().trim())));
 
         final var nextTurn = turns.get(1);
         run.setCurrentSequence(nextTurn.getSequenceNumber());
@@ -162,7 +163,7 @@ public class GameChronicleService {
         final var turn = requireCurrentTurn(run);
         requireCurrentUser(turn);
         final var draft = gameDraftRepository.findById(turn.getId()).orElseGet(() -> new GameDraftEntity(turn, ""));
-        draft.setContent(request.content());
+        draft.setContent(RichTextSanitizer.sanitize(request.content()));
         gameDraftRepository.save(draft);
     }
 
@@ -179,7 +180,7 @@ public class GameChronicleService {
         final var run = requireRunForUpdate(partyId, chronicleId);
         final var turn = requireCurrentTurn(run);
         requireCurrentUser(turn);
-        gameSegmentRepository.save(new GameSegmentEntity(turn, request.content().trim()));
+        gameSegmentRepository.save(new GameSegmentEntity(turn, RichTextSanitizer.sanitize(request.content().trim())));
         turn.setStatus(GameTurnStatusType.SUBMITTED);
         turn.setSubmittedAt(Instant.now());
         gameDraftRepository.deleteById(turn.getId());
@@ -230,11 +231,12 @@ public class GameChronicleService {
     ) {
         final var context = chronicleAccessService.requireNarrator(partyId, chronicleId);
         final var segment = requireSegment(context.chronicle(), segmentId);
+        final var sanitizedContent = RichTextSanitizer.sanitize(request.content().trim());
         segmentRevisionRepository.save(new SegmentRevisionEntity(
-                segment, context.membership().getUser(), segment.getContent(), request.content().trim(), segment.getStatus(),
+                segment, context.membership().getUser(), segment.getContent(), sanitizedContent, segment.getStatus(),
                 SegmentStatusType.EDITED, trimToNull(request.reason())
         ));
-        segment.setContent(request.content().trim());
+        segment.setContent(sanitizedContent);
         segment.setStatus(SegmentStatusType.EDITED);
         segment.setDisabledReason(null);
     }

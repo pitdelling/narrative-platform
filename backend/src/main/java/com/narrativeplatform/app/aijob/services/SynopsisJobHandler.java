@@ -8,6 +8,7 @@ import com.narrativeplatform.app.chronicle.models.entities.ChronicleSynopsisEnti
 import com.narrativeplatform.app.chronicle.models.entities.GameSegmentEntity;
 import com.narrativeplatform.app.chronicle.models.enums.SynopsisStatusType;
 import com.narrativeplatform.app.chronicle.repositories.ChronicleSynopsisRepository;
+import com.narrativeplatform.shared.utils.RichTextSanitizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
@@ -55,7 +56,7 @@ public class SynopsisJobHandler implements AiJobTypeHandler {
         for (final var segment : activeSegments) {
             builder.append("\n[Cycle ").append(segment.getCycleNumber())
                     .append(" | ").append(segment.getAuthor().getDisplayName()).append("]\n")
-                    .append(segment.getContent()).append("\n");
+                    .append(RichTextSanitizer.toPlainText(segment.getContent())).append("\n");
         }
         return builder.toString();
     }

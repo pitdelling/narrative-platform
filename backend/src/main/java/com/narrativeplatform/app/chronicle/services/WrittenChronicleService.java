@@ -23,6 +23,7 @@ import com.narrativeplatform.shared.exceptions.BadRequestException;
 import com.narrativeplatform.shared.exceptions.ConflictException;
 import com.narrativeplatform.shared.exceptions.ForbiddenException;
 import com.narrativeplatform.shared.exceptions.NotFoundException;
+import com.narrativeplatform.shared.utils.RichTextSanitizer;
 import com.narrativeplatform.shared.utils.TokenUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -115,7 +116,7 @@ public class WrittenChronicleService {
         if (document.getContentVersion() != request.expectedVersion()) {
             throw new ConflictException("The document changed. Reload before saving.");
         }
-        document.setContent(request.content());
+        document.setContent(RichTextSanitizer.sanitize(request.content()));
         document.setContentVersion(document.getContentVersion() + 1);
         document.setLockExpiresAt(Instant.now().plus(properties.writtenLockExpirationHours(), ChronoUnit.HOURS));
         context.chronicle().setStatus(ChronicleStatusType.IN_PROGRESS);
@@ -142,7 +143,7 @@ public class WrittenChronicleService {
         }
         context.chronicle().setStatus(ChronicleStatusType.PUBLISHED);
         context.chronicle().setPublishedAt(Instant.now());
-        context.chronicle().setGeneratedPreview(preview(document.getContent()));
+        context.chronicle().setGeneratedPreview(preview(RichTextSanitizer.toPlainText(document.getContent())));
         clearLock(document);
     }
 

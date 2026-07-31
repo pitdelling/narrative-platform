@@ -6,11 +6,15 @@ import com.narrativeplatform.app.auth.repositories.UserRepository;
 import com.narrativeplatform.app.canon.services.CanonMapGenerationService;
 import com.narrativeplatform.app.chronicle.models.entities.ChronicleEntity;
 import com.narrativeplatform.app.chronicle.models.entities.GameRunEntity;
+import com.narrativeplatform.app.chronicle.models.entities.GameSegmentEntity;
 import com.narrativeplatform.app.chronicle.models.entities.GameTurnEntity;
+import com.narrativeplatform.app.chronicle.models.entities.SegmentRevisionEntity;
 import com.narrativeplatform.app.chronicle.models.enums.ChronicleStatusType;
 import com.narrativeplatform.app.chronicle.models.enums.ChronicleType;
 import com.narrativeplatform.app.chronicle.models.enums.GameRunStatusType;
 import com.narrativeplatform.app.chronicle.models.enums.GameTurnStatusType;
+import com.narrativeplatform.app.chronicle.models.enums.SegmentStatusType;
+import com.narrativeplatform.app.chronicle.models.requests.EditSegmentRequest;
 import com.narrativeplatform.app.chronicle.models.requests.PublishGameSegmentRequest;
 import com.narrativeplatform.app.chronicle.repositories.*;
 import com.narrativeplatform.app.party.models.entities.PartyEntity;
@@ -26,6 +30,7 @@ import com.narrativeplatform.shared.exceptions.ConflictException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -115,9 +120,9 @@ class GameChronicleServiceTest {
         lastTurn.setExpiresAt(Instant.now().plusSeconds(3600));
 
         final var membership = new PartyMemberEntity(party, player, PartyRoleType.PLAYER, MemberStatusType.ACTIVE);
-        when(chronicleAccessService.requireMember(partyId, chronicleId))
+        lenient().when(chronicleAccessService.requireMember(partyId, chronicleId))
                 .thenReturn(new ChronicleAccessService.AccessContext(chronicle, membership));
-        when(currentUserService.require()).thenReturn(new AuthenticatedUser(player.getId(), player.getUsername()));
+        lenient().when(currentUserService.require()).thenReturn(new AuthenticatedUser(player.getId(), player.getUsername()));
     }
 
     @Test
@@ -147,5 +152,43 @@ class GameChronicleServiceTest {
         assertThrows(ConflictException.class,
                 () -> service.publish(partyId, chronicleId, new PublishGameSegmentRequest("A retried duplicate submission.")));
         verifyNoInteractions(aiJobService, canonMapGenerationService, chronicleSynopsisService);
+    }
+
+    @Test
+    void publishStripsDisallowedTagsFromTheSegmentContentBeforeSaving() {
+        when(gameRunRepository.findForUpdateByChronicleId(chronicleId)).thenReturn(Optional.of(run));
+        when(gameTurnRepository.findByRunIdAndSequenceNumber(run.getId(), 1)).thenReturn(Optional.of(lastTurn));
+        when(gameTurnRepository.findByRunIdAndSequenceNumber(run.getId(), 2)).thenReturn(Optional.empty());
+
+        service.publish(partyId, chronicleId, new PublishGameSegmentRequest("<p>Safe <b>bold</b></p><script>alert(1)</script>"));
+
+        final var captor = ArgumentCaptor.forClass(GameSegmentEntity.class);
+        verify(gameSegmentRepository).save(captor.capture());
+        final var savedContent = captor.getValue().getContent();
+        assertTrue(savedContent.contains("<b>bold</b>"));
+        assertFalse(savedContent.contains("<script>"));
+    }
+
+    @Test
+    void editSegmentSanitizesTheLiveSegmentAndTheRevisionSnapshotIdentically() {
+        final var segmentId = UUID.randomUUID();
+        final var segment = new GameSegmentEntity(lastTurn, "<p>Original</p>");
+        segment.setId(segmentId);
+        segment.setRun(run);
+
+        when(chronicleAccessService.requireNarrator(partyId, chronicleId))
+                .thenReturn(new ChronicleAccessService.AccessContext(chronicle, new PartyMemberEntity(
+                        chronicle.getParty(), player, PartyRoleType.NARRATOR, MemberStatusType.ACTIVE)));
+        when(gameSegmentRepository.findById(segmentId)).thenReturn(Optional.of(segment));
+
+        service.editSegment(partyId, chronicleId, segmentId,
+                new EditSegmentRequest("<p>Edited <b>bold</b></p><img src=x onerror=alert(1)>", "Fixed a typo."));
+
+        assertEquals("<p>Edited <b>bold</b></p>", segment.getContent());
+        assertEquals(SegmentStatusType.EDITED, segment.getStatus());
+
+        final var captor = ArgumentCaptor.forClass(SegmentRevisionEntity.class);
+        verify(segmentRevisionRepository).save(captor.capture());
+        assertEquals(segment.getContent(), captor.getValue().getNewContent());
     }
 }

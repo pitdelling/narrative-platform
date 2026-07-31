@@ -9,6 +9,7 @@ import com.narrativeplatform.app.chronicle.models.entities.GameSegmentEntity;
 import com.narrativeplatform.app.chronicle.models.entities.GeneratedStoryEntity;
 import com.narrativeplatform.app.chronicle.models.enums.ChronicleStatusType;
 import com.narrativeplatform.app.chronicle.repositories.GeneratedStoryRepository;
+import com.narrativeplatform.shared.utils.RichTextSanitizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
@@ -62,7 +63,7 @@ public class AdaptationJobHandler implements AiJobTypeHandler {
         for (final var segment : activeSegments) {
             builder.append("\n[Cycle ").append(segment.getCycleNumber())
                     .append(" | ").append(segment.getAuthor().getDisplayName()).append("]\n")
-                    .append(segment.getContent()).append("\n");
+                    .append(RichTextSanitizer.toPlainText(segment.getContent())).append("\n");
         }
         return builder.toString();
     }
