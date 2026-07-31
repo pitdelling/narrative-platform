@@ -1,5 +1,6 @@
 import type { Segment, Turn } from "@/lib/types";
 import { formatDateTime, turnStatusLabels } from "@/lib/format";
+import { RichTextViewer } from "@/components/RichTextViewer";
 
 interface ThreadSegmentRowProps {
   turn: Turn;
@@ -38,7 +39,9 @@ export function ThreadSegmentRow({ turn, segment, narrator, onEdit, onDisable, o
           ? segment.visible
             ? (
               <>
-                <p className="segment-content">{segment.status === "DISABLED" ? "Removido pelo Narrador" : segment.content}</p>
+                {segment.status === "DISABLED"
+                  ? <p className="segment-content">Removido pelo Narrador</p>
+                  : <RichTextViewer className="segment-content" html={segment.content ?? ""} />}
                 {segment.status === "DISABLED" && segment.disabledReason && <p className="removal-reason">Motivo: {segment.disabledReason}</p>}
                 {narrator && (
                   <div className="thread-actions">

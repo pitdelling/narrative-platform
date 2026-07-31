@@ -123,9 +123,71 @@ p { line-height: 1.6; }
 .button:disabled { opacity: .55; cursor: not-allowed; transform: none; }
 .text-button { padding: 0; color: var(--heading); background: none; border: none; text-decoration: underline; }
 label { display: grid; gap: .38rem; color: var(--heading); font-weight: 600; }
+/* Use for a field caption that wraps a widget with its own interactive controls (buttons,
+   inputs) instead of a real <label>: clicking anywhere inside a native <label> synthesizes a
+   click on its first labelable descendant, which would otherwise randomly activate whichever
+   button/input happens to come first in the widget's toolbar. */
+.field { display: grid; gap: .38rem; }
+.field-label { color: var(--heading); font-weight: 600; }
 input, textarea, select { width: 100%; padding: .78rem .85rem; color: var(--ink); background: rgba(var(--surface-rgb),.8); border: 1px solid rgba(var(--border-rgb),.36); border-radius: 8px; outline: none; }
 input:focus, textarea:focus, select:focus { border-color: rgb(var(--emphasis-rgb)); box-shadow: 0 0 0 3px rgba(var(--emphasis-rgb),.10); }
 textarea { resize: vertical; line-height: 1.65; }
+.rte-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-bottom: .5rem; }
+.rte-toolbar-group { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; }
+.rte-toolbar-sep { width: 1px; align-self: stretch; min-height: 1.6rem; background: rgba(var(--border-rgb),.4); margin: 0 .2rem; }
+.rte-toolbar .invite-icon-button.active { color: var(--heading); border-color: var(--gold); background: rgba(var(--parchment-rgb),.4); }
+.rte-content { min-height: 8rem; padding: .78rem .85rem; color: var(--ink); background: rgba(var(--surface-rgb),.8); border: 1px solid rgba(var(--border-rgb),.36); border-radius: 8px; line-height: 1.65; font-weight: 400; }
+.rte-content:focus { outline: none; border-color: rgb(var(--emphasis-rgb)); box-shadow: 0 0 0 3px rgba(var(--emphasis-rgb),.10); }
+.rte-content[contenteditable="false"] { background: rgba(var(--parchment-rgb),.15); }
+.rte-content.is-empty::before { content: attr(data-placeholder); color: var(--muted); pointer-events: none; float: left; height: 0; }
+.rte-content p, .rte-content ul, .rte-content ol { margin: 0 0 .6rem; }
+.rte-content p:last-child, .rte-content ul:last-child, .rte-content ol:last-child { margin-bottom: 0; }
+.rte-content ul, .rte-content ol { padding-left: 1.4rem; }
+.rte-char-count { display: block; margin-top: .3rem; color: var(--muted); font-size: .78rem; }
+
+/* Smart ordered lists: alternate decimal ("1.") / lower-alpha ("a)") numbering by nesting
+   depth, up to 4 levels, showing the full compound path at each level (e.g. "1.a.1."). Each
+   level's kind is fully determined by which kind the outermost list started as, so only the
+   two starting chains need to be spelled out (no combinatorial explosion). Lists deeper than
+   4 levels fall back to plain browser decimal numbering via the base `ol` rule below. */
+.rte-content ol, .segment-content ol, .last-message ol { list-style: decimal; }
+.rte-content ol[data-kind], .segment-content ol[data-kind], .last-message ol[data-kind] { list-style: none; }
+.rte-content ol[data-kind] > li, .segment-content ol[data-kind] > li, .last-message ol[data-kind] > li { position: relative; }
+.rte-content ol[data-kind] > li::before, .segment-content ol[data-kind] > li::before, .last-message ol[data-kind] > li::before {
+  position: absolute; right: 100%; margin-right: .35rem; white-space: nowrap; color: inherit;
+}
+
+.rte-content ol[data-kind="decimal"], .segment-content ol[data-kind="decimal"], .last-message ol[data-kind="decimal"] { counter-reset: item1; }
+.rte-content ol[data-kind="decimal"] > li, .segment-content ol[data-kind="decimal"] > li, .last-message ol[data-kind="decimal"] > li { counter-increment: item1; }
+.rte-content ol[data-kind="decimal"] > li::before, .segment-content ol[data-kind="decimal"] > li::before, .last-message ol[data-kind="decimal"] > li::before { content: counter(item1) "."; }
+
+.rte-content ol[data-kind="alpha"], .segment-content ol[data-kind="alpha"], .last-message ol[data-kind="alpha"] { counter-reset: item1; }
+.rte-content ol[data-kind="alpha"] > li, .segment-content ol[data-kind="alpha"] > li, .last-message ol[data-kind="alpha"] > li { counter-increment: item1; }
+.rte-content ol[data-kind="alpha"] > li::before, .segment-content ol[data-kind="alpha"] > li::before, .last-message ol[data-kind="alpha"] > li::before { content: counter(item1, lower-alpha) ")"; }
+
+.rte-content ol[data-kind="decimal"] > li > ol, .segment-content ol[data-kind="decimal"] > li > ol, .last-message ol[data-kind="decimal"] > li > ol { counter-reset: item2; }
+.rte-content ol[data-kind="decimal"] > li > ol > li, .segment-content ol[data-kind="decimal"] > li > ol > li, .last-message ol[data-kind="decimal"] > li > ol > li { counter-increment: item2; }
+.rte-content ol[data-kind="decimal"] > li > ol > li::before, .segment-content ol[data-kind="decimal"] > li > ol > li::before, .last-message ol[data-kind="decimal"] > li > ol > li::before { content: counter(item1) "." counter(item2, lower-alpha) ")"; }
+
+.rte-content ol[data-kind="alpha"] > li > ol, .segment-content ol[data-kind="alpha"] > li > ol, .last-message ol[data-kind="alpha"] > li > ol { counter-reset: item2; }
+.rte-content ol[data-kind="alpha"] > li > ol > li, .segment-content ol[data-kind="alpha"] > li > ol > li, .last-message ol[data-kind="alpha"] > li > ol > li { counter-increment: item2; }
+.rte-content ol[data-kind="alpha"] > li > ol > li::before, .segment-content ol[data-kind="alpha"] > li > ol > li::before, .last-message ol[data-kind="alpha"] > li > ol > li::before { content: counter(item1, lower-alpha) "." counter(item2) "."; }
+
+.rte-content ol[data-kind="decimal"] > li > ol > li > ol, .segment-content ol[data-kind="decimal"] > li > ol > li > ol, .last-message ol[data-kind="decimal"] > li > ol > li > ol { counter-reset: item3; }
+.rte-content ol[data-kind="decimal"] > li > ol > li > ol > li, .segment-content ol[data-kind="decimal"] > li > ol > li > ol > li, .last-message ol[data-kind="decimal"] > li > ol > li > ol > li { counter-increment: item3; }
+.rte-content ol[data-kind="decimal"] > li > ol > li > ol > li::before, .segment-content ol[data-kind="decimal"] > li > ol > li > ol > li::before, .last-message ol[data-kind="decimal"] > li > ol > li > ol > li::before { content: counter(item1) "." counter(item2, lower-alpha) "." counter(item3) "."; }
+
+.rte-content ol[data-kind="alpha"] > li > ol > li > ol, .segment-content ol[data-kind="alpha"] > li > ol > li > ol, .last-message ol[data-kind="alpha"] > li > ol > li > ol { counter-reset: item3; }
+.rte-content ol[data-kind="alpha"] > li > ol > li > ol > li, .segment-content ol[data-kind="alpha"] > li > ol > li > ol > li, .last-message ol[data-kind="alpha"] > li > ol > li > ol > li { counter-increment: item3; }
+.rte-content ol[data-kind="alpha"] > li > ol > li > ol > li::before, .segment-content ol[data-kind="alpha"] > li > ol > li > ol > li::before, .last-message ol[data-kind="alpha"] > li > ol > li > ol > li::before { content: counter(item1, lower-alpha) "." counter(item2) "." counter(item3, lower-alpha) ")"; }
+
+.rte-content ol[data-kind="decimal"] > li > ol > li > ol > li > ol, .segment-content ol[data-kind="decimal"] > li > ol > li > ol > li > ol, .last-message ol[data-kind="decimal"] > li > ol > li > ol > li > ol { counter-reset: item4; }
+.rte-content ol[data-kind="decimal"] > li > ol > li > ol > li > ol > li, .segment-content ol[data-kind="decimal"] > li > ol > li > ol > li > ol > li, .last-message ol[data-kind="decimal"] > li > ol > li > ol > li > ol > li { counter-increment: item4; }
+.rte-content ol[data-kind="decimal"] > li > ol > li > ol > li > ol > li::before, .segment-content ol[data-kind="decimal"] > li > ol > li > ol > li > ol > li::before, .last-message ol[data-kind="decimal"] > li > ol > li > ol > li > ol > li::before { content: counter(item1) "." counter(item2, lower-alpha) "." counter(item3) "." counter(item4, lower-alpha) ")"; }
+
+.rte-content ol[data-kind="alpha"] > li > ol > li > ol > li > ol, .segment-content ol[data-kind="alpha"] > li > ol > li > ol > li > ol, .last-message ol[data-kind="alpha"] > li > ol > li > ol > li > ol { counter-reset: item4; }
+.rte-content ol[data-kind="alpha"] > li > ol > li > ol > li > ol > li, .segment-content ol[data-kind="alpha"] > li > ol > li > ol > li > ol > li, .last-message ol[data-kind="alpha"] > li > ol > li > ol > li > ol > li { counter-increment: item4; }
+.rte-content ol[data-kind="alpha"] > li > ol > li > ol > li > ol > li::before, .segment-content ol[data-kind="alpha"] > li > ol > li > ol > li > ol > li::before, .last-message ol[data-kind="alpha"] > li > ol > li > ol > li > ol > li::before { content: counter(item1, lower-alpha) "." counter(item2) "." counter(item3, lower-alpha) "." counter(item4) "."; }
 .error-message { color: var(--danger); }
 .brand-mark { display: flex; align-items: center; gap: .9rem; color: var(--heading); }
 .brand-mark strong { display: block; font-family: var(--font-display), serif; font-size: 1.45rem; }
@@ -368,10 +430,13 @@ textarea { resize: vertical; line-height: 1.65; }
 .thread-body { padding: 1.2rem 1.4rem; }
 .thread-meta { display: flex; justify-content: space-between; gap: 1rem; color: var(--muted); }
 .thread-meta strong { color: var(--heading); }
-.segment-content { white-space: pre-wrap; font-family: var(--font-display), serif; font-size: 1.15rem; }
+.segment-content { font-family: var(--font-display), serif; font-size: 1.15rem; }
+.segment-content p, .segment-content ul, .segment-content ol { margin: 0 0 .6rem; }
+.segment-content p:last-child, .segment-content ul:last-child, .segment-content ol:last-child { margin-bottom: 0; }
+.segment-content ul, .segment-content ol { padding-left: 1.4rem; }
 .thread-item.disabled .thread-body { color: var(--disabled-fg); background: var(--disabled-bg); border-color: rgba(var(--disabled-rgb),.24); filter: grayscale(.55); }
 .removal-reason { padding: .6rem .8rem; background: rgba(var(--disabled-rgb),.08); border-left: 3px solid var(--disabled-fg); }
-.thread-actions { display: flex; gap: .5rem; }
+.thread-actions { display: flex; gap: .5rem; margin-top: 1.5rem }
 .thread-actions button { padding: .35rem .55rem; color: var(--heading); background: transparent; border: 1px solid var(--border); border-radius: 6px; }
 .hidden-fragment { display: grid; align-content: center; gap: .4rem; padding: 1rem; color: var(--muted); background: repeating-linear-gradient(135deg, rgba(var(--emphasis-rgb),.05) 0 8px, rgba(var(--emphasis-rgb),.09) 8px 9px); border: 1px dashed rgba(var(--emphasis-rgb),.22); border-radius: 8px; }
 .hidden-fragment span { color: var(--heading); font-weight: 600; }
@@ -542,6 +607,8 @@ input[type="color"] { width: 34px; height: 34px; padding: 0; border: 1px solid v
 .modal-heading p { margin: .25rem 0; color: var(--muted); }
 .story-modal .modal-heading { align-items: center; margin-bottom: 1.75rem; }
 .modal-actions { display: flex; align-items: center; gap: .75rem; flex-wrap: nowrap; min-width: 0; }
+.edit-segment-modal .rte-char-count { margin-bottom: 1rem; }
+.edit-segment-modal .modal-actions { margin-top: 1rem; }
 .modal-actions select { flex: 1 1 auto; min-width: 0; }
 .regenerate-button { white-space: nowrap; flex-shrink: 0; display: inline-flex; align-items: center; gap: .4rem; }
 @media (max-width: 520px) {
@@ -564,10 +631,12 @@ input[type="color"] { width: 34px; height: 34px; padding: 0; border: 1px solid v
 /* Chronicle flow */
 .turn-composer { margin: 0 0 2rem; border-color: rgba(var(--emphasis-rgb),.35); box-shadow: 0 12px 32px rgba(var(--emphasis-rgb),.10); }
 .turn-composer h2 { margin-bottom: 1rem; }
-.last-message { margin-top: 1rem; padding: 1rem 1.1rem; background: rgba(var(--parchment-rgb),.34); border-left: 3px solid var(--gold); border-radius: 7px; }
+.last-message { margin-top: 1rem; margin-bottom: 1rem; padding: 1rem 1.1rem; background: rgba(var(--parchment-rgb),.34); border-left: 3px solid var(--gold); border-radius: 7px; }
 .last-message > span { display: block; margin-bottom: .35rem; color: var(--copper); font-size: .74rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
 .last-message strong { color: var(--heading); }
-.last-message p { margin-bottom: 0; white-space: pre-wrap; font-family: var(--font-display), serif; font-size: 1.08rem; }
+.last-message p, .last-message ul, .last-message ol { margin: 0 0 .6rem; font-family: var(--font-display), serif; font-size: 1.08rem; }
+.last-message p:last-child, .last-message ul:last-child, .last-message ol:last-child { margin-bottom: 0; }
+.last-message ul, .last-message ol { padding-left: 1.4rem; }
 .hidden-fragment { position: relative; overflow: hidden; padding: 0; }
 .hidden-fragment-easter-egg { min-height: inherit; display: grid; place-items: center; padding: 1.2rem; color: var(--heading); background: rgba(var(--parchment-rgb),.9); font-family: var(--font-display), serif; font-size: 1.02rem; text-align: center; }
 .hidden-fragment-cover { position: absolute; inset: 0; z-index: 2; display: grid; align-content: center; gap: .4rem; padding: 1rem; color: var(--muted); background: repeating-linear-gradient(135deg, rgba(var(--parchment-rgb),.95) 0 8px, rgba(var(--parchment-rgb),.82) 8px 9px); border-radius: 8px; }

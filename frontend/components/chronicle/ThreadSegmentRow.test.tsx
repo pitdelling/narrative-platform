@@ -103,4 +103,34 @@ describe("ThreadSegmentRow", () => {
     );
     expect(screen.getByText("Turno expirado")).toBeInTheDocument();
   });
+
+  it("renders rich-text formatting from the segment content", () => {
+    const { container } = render(
+      <ThreadSegmentRow
+        turn={buildTurn()}
+        segment={buildSegment({ content: "<p>A porta <strong>rangeu</strong> ao abrir.</p>" })}
+        narrator={false}
+        onEdit={noop}
+        onDisable={noop}
+        onRestore={noop}
+      />,
+    );
+    expect(container.querySelector(".segment-content strong")).toHaveTextContent("rangeu");
+  });
+
+  it("never lets a disallowed tag from the segment content reach the DOM", () => {
+    const { container } = render(
+      <ThreadSegmentRow
+        turn={buildTurn()}
+        segment={buildSegment({ content: "<p>Safe</p><script>window.__xss = true;</script><img src=x onerror=\"window.__xss = true\">" })}
+        narrator={false}
+        onEdit={noop}
+        onDisable={noop}
+        onRestore={noop}
+      />,
+    );
+    expect(container.querySelector("script")).toBeNull();
+    expect(container.querySelector("img")).toBeNull();
+    expect(screen.getByText("Safe")).toBeInTheDocument();
+  });
 });

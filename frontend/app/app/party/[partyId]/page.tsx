@@ -9,6 +9,7 @@ import { AppShell } from "@/components/AppShell";
 import { AiTagSettingsPanel } from "@/components/chronicle/AiTagSettingsPanel";
 import { GameProgressBar } from "@/components/chronicle/GameProgressBar";
 import { WhatsAppIcon } from "@/components/WhatsAppIcon";
+import { isContentEmpty, RichTextEditor } from "@/components/RichTextEditor";
 
 const roleLabels: Record<PartyRole, string> = {
   OWNER: "Proprietário",
@@ -80,6 +81,10 @@ export default function PartyArchivePage() {
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage("");
+    if (kind === "GAME" && isContentEmpty(initialContent)) {
+      setMessage("Escreva o início da história.");
+      return;
+    }
     try {
       const body = kind === "GAME"
         ? { title, cycleCount: cycles, initialContent }
@@ -354,16 +359,16 @@ export default function PartyArchivePage() {
                   <option value={3}>3 ciclos</option>
                 </select>
               </label>
-              <label>Início da história
-                <textarea
-                  rows={9}
+              <div className="field">
+                <span className="field-label">Início da história</span>
+                <RichTextEditor
+                  value={initialContent}
+                  onChange={setInitialContent}
                   maxLength={10000}
                   placeholder="Escreva o primeiro fragmento. Ao criar, a história já será iniciada e passará para a próxima pessoa."
-                  value={initialContent}
-                  onChange={(event) => setInitialContent(event.target.value)}
-                  required
+                  ariaLabel="Início da história"
                 />
-              </label>
+              </div>
             </>
           ) : (
             <fieldset>

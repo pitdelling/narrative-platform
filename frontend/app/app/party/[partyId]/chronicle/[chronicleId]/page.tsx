@@ -11,10 +11,13 @@ import { AppShell } from "@/components/AppShell";
 import { AiProcessingTimer } from "@/components/chronicle/AiProcessingTimer";
 import { ChronicleCompletedHeader } from "@/components/chronicle/ChronicleCompletedHeader";
 import { CanonMapPanel } from "@/components/chronicle/CanonMapPanel";
+import { EditSegmentModal } from "@/components/chronicle/EditSegmentModal";
 import { GameProgressBar } from "@/components/chronicle/GameProgressBar";
 import { ParticipantsPanel } from "@/components/chronicle/ParticipantsPanel";
 import { StoryModal } from "@/components/chronicle/StoryModal";
 import { ThreadSegmentRow } from "@/components/chronicle/ThreadSegmentRow";
+import { isContentEmpty, RichTextEditor } from "@/components/RichTextEditor";
+import { RichTextViewer } from "@/components/RichTextViewer";
 
 export default function ChronicleDetailPage() {
   const { partyId, chronicleId } = useParams<{ partyId: string; chronicleId: string }>();
@@ -36,6 +39,7 @@ function GameView({ partyId, chronicleId }: { partyId: string; chronicleId: stri
   const [revealed, setRevealed] = useState(false);
   const [message, setMessage] = useState("");
   const [storyModalOpen, setStoryModalOpen] = useState(false);
+  const [editSegmentTarget, setEditSegmentTarget] = useState<Segment | null>(null);
   const [refreshToken, setRefreshToken] = useState(0);
   const [aiStartedAt, setAiStartedAt] = useState<number>();
   const previousProcessing = useRef(false);
@@ -122,9 +126,10 @@ function GameView({ partyId, chronicleId }: { partyId: string; chronicleId: stri
     await action(`/segments/${segment.id}/disable`, { reason });
   }
 
-  async function edit(segment: Segment) {
-    const content = window.prompt("Novo conteúdo:", segment.content ?? "");
-    if (content) await action(`/segments/${segment.id}/edit`, { content, reason: "Edited by narrator." });
+  async function saveEditedSegment(content: string, reason: string) {
+    if (!editSegmentTarget) return;
+    const saved = await action(`/segments/${editSegmentTarget.id}/edit`, { content, reason });
+    if (saved) setEditSegmentTarget(null);
   }
 
   if (loadError) {
@@ -247,17 +252,23 @@ function GameView({ partyId, chronicleId }: { partyId: string; chronicleId: stri
             <aside className="last-message">
               <span>A última mensagem foi:</span>
               <strong>{previousMessage.author}</strong>
-              <p>{previousMessage.content}</p>
+              <RichTextViewer html={previousMessage.content ?? ""} />
             </aside>
           )}
-          <textarea rows={11} value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={10000} placeholder="Escreva apenas o que acontece a seguir..." />
+          <RichTextEditor
+            value={draft}
+            onChange={setDraft}
+            maxLength={10000}
+            placeholder="Escreva apenas o que acontece a seguir..."
+            ariaLabel="Conteúdo do turno"
+          />
           <div className="editor-actions">
             <button className="button secondary" onClick={() => action("/game/draft", { content: draft })}>Salvar</button>
-            <button className="button primary" onClick={() => action("/game/publish", { content: draft })} disabled={!draft.trim()}>Publicar e passar</button>
+            <button className="button primary" onClick={() => action("/game/publish", { content: draft })} disabled={isContentEmpty(draft)}>Publicar e passar</button>
             {nextTurn && (
               <button
                 className="button secondary"
-                disabled={!draft.trim()}
+                disabled={isContentEmpty(draft)}
                 onClick={async () => {
                   const published = await action("/game/publish", { content: draft });
                   if (published) {
@@ -289,7 +300,7 @@ function GameView({ partyId, chronicleId }: { partyId: string; chronicleId: stri
                 turn={turn}
                 segment={segments.get(turn.sequenceNumber)}
                 narrator={data.narrator}
-                onEdit={edit}
+                onEdit={setEditSegmentTarget}
                 onDisable={disable}
                 onRestore={(segment) => action(`/segments/${segment.id}/restore`)}
               />
@@ -311,6 +322,13 @@ function GameView({ partyId, chronicleId }: { partyId: string; chronicleId: stri
         canRegenerate={canRegenerate}
         isRegenerating={isRegenerating}
         onRegenerate={() => action("/regenerate")}
+      />
+
+      <EditSegmentModal
+        open={editSegmentTarget !== null}
+        segment={editSegmentTarget}
+        onClose={() => setEditSegmentTarget(null)}
+        onSave={saveEditedSegment}
       />
     </>
   );
@@ -407,7 +425,7 @@ function WrittenView({ partyId, chronicleId }: { partyId: string; chronicleId: s
 
       <section className="written-editor card">
         {data.lockedBy && !lockToken && <div className="lock-banner">Bloqueado para edição por <strong>{data.lockedBy}</strong>.</div>}
-        <textarea rows={24} value={content} onChange={(event) => setContent(event.target.value)} readOnly={!lockToken} />
+        <RichTextEditor value={content} onChange={setContent} readOnly={!lockToken} ariaLabel="Conteúdo da história escrita" />
         {data.canEdit && (
           <div className="editor-actions">
             {!lockToken
