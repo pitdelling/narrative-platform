@@ -91,7 +91,7 @@ function GameView({ partyId, chronicleId }: { partyId: string; chronicleId: stri
     return () => window.clearTimeout(timeoutId);
   }, [processing, revealed, load]);
 
-  async function action(path: string, body?: unknown, method = "POST") {
+  async function action(path: string, body?: unknown, method = "POST"): Promise<boolean> {
     setMessage("");
     try {
       await api(`/parties/${partyId}/chronicles/${chronicleId}${path}`, {
@@ -100,8 +100,10 @@ function GameView({ partyId, chronicleId }: { partyId: string; chronicleId: stri
       });
       await load(revealed);
       setRefreshToken((token) => token + 1);
+      return true;
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "A ação falhou.");
+      return false;
     }
   }
 
@@ -146,6 +148,7 @@ function GameView({ partyId, chronicleId }: { partyId: string; chronicleId: stri
   const canRegenerate = data.narrator && ["PUBLISHED", "FAILED"].includes(data.status);
   const isRegenerating = data.narrator && ["AI_PENDING", "AI_PROCESSING"].includes(data.status);
   const me = data.participants.find((participant) => participant.userId === data.currentUserId);
+  const nextTurn = data.turns.find((turn) => turn.sequenceNumber === data.currentSequence + 1);
 
   const headerActions = (
     <>
@@ -251,6 +254,21 @@ function GameView({ partyId, chronicleId }: { partyId: string; chronicleId: stri
           <div className="editor-actions">
             <button className="button secondary" onClick={() => action("/game/draft", { content: draft })}>Salvar</button>
             <button className="button primary" onClick={() => action("/game/publish", { content: draft })} disabled={!draft.trim()}>Publicar e passar</button>
+            {nextTurn && (
+              <button
+                className="button secondary"
+                disabled={!draft.trim()}
+                onClick={async () => {
+                  const published = await action("/game/publish", { content: draft });
+                  if (published) {
+                    const message = `O Arquivista me pediu para te avisar que é a sua vez *${nextTurn.author}*`;
+                    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer");
+                  }
+                }}
+              >
+                Publicar, passar e avisar o próximo
+              </button>
+            )}
             <button className="button ghost" onClick={() => action("/game/skip")}>Pular</button>
             <button className="button ghost" onClick={() => { setDraft(""); void action("/game/draft", undefined, "DELETE"); }}>Limpar</button>
           </div>

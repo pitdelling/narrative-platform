@@ -1,4 +1,4 @@
-export type PartyRole = "OWNER" | "NARRATOR" | "PLAYER";
+export type PartyRole = "OWNER" | "NARRATOR" | "PLAYER" | "SPECTATOR";
 export type ChronicleType = "WRITTEN" | "GAME";
 export type ChronicleStatus = "DRAFT" | "IN_PROGRESS" | "AI_PENDING" | "AI_PROCESSING" | "PUBLISHED" | "FAILED" | "ARCHIVED";
 

@@ -14,6 +14,7 @@ const roleLabels: Record<PartyRole, string> = {
   OWNER: "Proprietário",
   NARRATOR: "Narrador",
   PLAYER: "Jogador",
+  SPECTATOR: "Espectador",
 };
 
 const statusLabels: Record<PartyMember["status"], string> = {
@@ -47,6 +48,10 @@ export default function PartyArchivePage() {
   const [membersCopyFeedback, setMembersCopyFeedback] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [inviteError, setInviteError] = useState("");
+  const [spectatorInvitation, setSpectatorInvitation] = useState<PartyInvitationLink>();
+  const [spectatorCopyFeedback, setSpectatorCopyFeedback] = useState(false);
+  const [spectatorRegenerating, setSpectatorRegenerating] = useState(false);
+  const [spectatorInviteError, setSpectatorInviteError] = useState("");
   const [message, setMessage] = useState("");
   const narrator = party?.currentUserRole === "OWNER" || party?.currentUserRole === "NARRATOR";
   const owner = party?.currentUserRole === "OWNER";
@@ -61,6 +66,7 @@ export default function PartyArchivePage() {
     setChronicles(chronicleCards);
     if (partyDetail.currentUserRole === "OWNER" || partyDetail.currentUserRole === "NARRATOR") {
       setInvitation(await api<PartyInvitationLink>(`/parties/${partyId}/invitation`));
+      setSpectatorInvitation(await api<PartyInvitationLink>(`/parties/${partyId}/invitation/spectator`));
     }
   }, [partyId]);
 
@@ -122,6 +128,39 @@ export default function PartyArchivePage() {
       setInviteError(cause instanceof Error ? cause.message : "Não foi possível gerar um novo link.");
     } finally {
       setRegenerating(false);
+    }
+  }
+
+  function buildSpectatorInviteMessage() {
+    if (!party || !spectatorInvitation) return "";
+    const appName = process.env.NEXT_PUBLIC_APP_NAME ?? "Narrative Platform";
+    return `Por ordem solene de um Narrador, você foi nomeado(a) Observador(a) das Crônicas da party "${party.name}" no reino de "${appName}" — testemunha silenciosa das histórias, sem tomar parte na escrita. Aceite esta incumbência apresentando o seu selo: ${spectatorInvitation.inviteUrl}!`;
+  }
+
+  async function copySpectatorInviteMessage() {
+    const inviteMessage = buildSpectatorInviteMessage();
+    if (!inviteMessage) return;
+    await navigator.clipboard.writeText(inviteMessage);
+    setSpectatorCopyFeedback(true);
+    window.setTimeout(() => setSpectatorCopyFeedback(false), 2000);
+  }
+
+  function sendSpectatorInviteWhatsApp() {
+    const inviteMessage = buildSpectatorInviteMessage();
+    if (!inviteMessage) return;
+    window.open(`https://wa.me/?text=${encodeURIComponent(inviteMessage)}`, "_blank", "noopener,noreferrer");
+  }
+
+  async function regenerateSpectatorLink() {
+    if (!window.confirm("Gerar um novo link invalida o link de espectador atual imediatamente. Continuar?")) return;
+    setSpectatorInviteError("");
+    setSpectatorRegenerating(true);
+    try {
+      setSpectatorInvitation(await api<PartyInvitationLink>(`/parties/${partyId}/invitation/spectator/regenerate`, { method: "POST" }));
+    } catch (cause) {
+      setSpectatorInviteError(cause instanceof Error ? cause.message : "Não foi possível gerar um novo link.");
+    } finally {
+      setSpectatorRegenerating(false);
     }
   }
 
@@ -203,6 +242,43 @@ export default function PartyArchivePage() {
             </div>
           </div>
           {inviteError && <small className="invite-members-error">{inviteError}</small>}
+          {spectatorInvitation && (
+            <div className="invite-members-row">
+              <span className="invite-members-label">Convite para Espectadores:</span>
+              <code className="invite-members-url" title={spectatorInvitation.inviteUrl}>{spectatorInvitation.inviteUrl}</code>
+              <div className="invite-members-actions">
+                <button
+                  type="button"
+                  className="invite-icon-button"
+                  title={spectatorRegenerating ? "Gerando novo link..." : "Gerar novo link de espectador"}
+                  aria-label="Gerar novo link de espectador"
+                  onClick={regenerateSpectatorLink}
+                  disabled={spectatorRegenerating}
+                >
+                  ↻
+                </button>
+                <button
+                  type="button"
+                  className="invite-icon-button"
+                  title={spectatorCopyFeedback ? "Copiado!" : "Copiar convite de espectador"}
+                  aria-label="Copiar convite de espectador"
+                  onClick={copySpectatorInviteMessage}
+                >
+                  {spectatorCopyFeedback ? "✓" : "⧉"}
+                </button>
+                <button
+                  type="button"
+                  className="invite-icon-button"
+                  title="Enviar convite de espectador pelo WhatsApp"
+                  aria-label="Enviar convite de espectador pelo WhatsApp"
+                  onClick={sendSpectatorInviteWhatsApp}
+                >
+                  <WhatsAppIcon />
+                </button>
+              </div>
+            </div>
+          )}
+          {spectatorInviteError && <small className="invite-members-error">{spectatorInviteError}</small>}
         </div>
       )}
 
@@ -231,8 +307,15 @@ export default function PartyArchivePage() {
                     {owner && member.status === "ACTIVE" && member.role === "PLAYER" && (
                       <button className="button secondary" onClick={() => updateRole(member, "NARRATOR")}>Tornar narrador</button>
                     )}
-                    {owner && member.status === "ACTIVE" && member.role === "NARRATOR" && (
+                    {owner && member.status === "ACTIVE" && (member.role === "NARRATOR" || member.role === "SPECTATOR") && (
                       <button className="button secondary" onClick={() => updateRole(member, "PLAYER")}>Tornar jogador</button>
+                    )}
+                    {owner && member.status === "ACTIVE" && (member.role === "PLAYER" || member.role === "NARRATOR") && (
+                      <button className="button secondary" onClick={() => {
+                        if (window.confirm(`Tornar ${member.displayName} espectador? A pessoa deixará de participar dos próximos ciclos das histórias em andamento, podendo apenas visualizá-las.`)) {
+                          void updateRole(member, "SPECTATOR");
+                        }
+                      }}>Tornar espectador</button>
                     )}
                     {owner && member.status === "ACTIVE" && (
                       <button className="button secondary" onClick={() => {
@@ -285,7 +368,7 @@ export default function PartyArchivePage() {
           ) : (
             <fieldset>
               <legend>Quem pode editar?</legend>
-              {party?.members.filter((member) => member.status === "ACTIVE").map((member) => (
+              {party?.members.filter((member) => member.status === "ACTIVE" && member.role !== "SPECTATOR").map((member) => (
                 <label className="checkbox" key={member.userId}>
                   <input
                     type="checkbox"
