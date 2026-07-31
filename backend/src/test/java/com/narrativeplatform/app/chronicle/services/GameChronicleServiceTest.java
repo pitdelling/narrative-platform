@@ -58,6 +58,8 @@ class GameChronicleServiceTest {
     @Mock
     private UserRepository userRepository;
     @Mock
+    private GameParticipantRepository gameParticipantRepository;
+    @Mock
     private ChronicleAccessService chronicleAccessService;
     @Mock
     private CurrentUserService currentUserService;
@@ -89,7 +91,7 @@ class GameChronicleServiceTest {
         service = new GameChronicleService(
                 chronicleRepository, gameRunRepository, gameTurnRepository, gameDraftRepository,
                 gameSegmentRepository, generatedStoryRepository, segmentRevisionRepository,
-                partyMemberRepository, userRepository, partyAccessService, chronicleAccessService,
+                partyMemberRepository, userRepository, gameParticipantRepository, partyAccessService, chronicleAccessService,
                 currentUserService, properties, aiJobService, canonMapGenerationService, chronicleSynopsisService
         );
 

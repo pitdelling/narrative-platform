@@ -23,6 +23,7 @@ public record GameChronicleDetailResponse(
         String currentDraft,
         GeneratedStoryResponse generatedStory,
         List<GameTurnResponse> turns,
-        List<GameSegmentResponse> segments
+        List<GameSegmentResponse> segments,
+        List<GameParticipantResponse> participants
 ) {
 }

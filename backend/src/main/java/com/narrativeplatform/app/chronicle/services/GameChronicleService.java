@@ -1,5 +1,6 @@
 package com.narrativeplatform.app.chronicle.services;
 
+import com.narrativeplatform.app.aijob.models.enums.AiJobType;
 import com.narrativeplatform.app.aijob.services.AiJobService;
 import com.narrativeplatform.app.canon.services.CanonMapGenerationService;
 import com.narrativeplatform.app.auth.models.entities.UserEntity;
@@ -46,6 +47,7 @@ public class GameChronicleService {
     private final SegmentRevisionRepository segmentRevisionRepository;
     private final PartyMemberRepository partyMemberRepository;
     private final UserRepository userRepository;
+    private final GameParticipantRepository gameParticipantRepository;
     private final PartyAccessService partyAccessService;
     private final ChronicleAccessService chronicleAccessService;
     private final CurrentUserService currentUserService;
@@ -89,6 +91,7 @@ public class GameChronicleService {
         final var nextTurn = turns.get(1);
         run.setCurrentSequence(nextTurn.getSequenceNumber());
         activate(nextTurn, startedAt);
+        gameParticipantRepository.saveAll(orderedUsers.stream().map(user -> new GameParticipantEntity(run, user)).toList());
         log.debug(
                 "Created game chronicle {} for party {} with {} cycle(s) and {} participant(s).",
                 chronicle.getId(), partyId, request.cycleCount(), orderedUsers.size()
@@ -128,13 +131,15 @@ public class GameChronicleService {
         final var currentDraft = currentUserTurn
                 ? gameDraftRepository.findById(currentTurn.getId()).map(GameDraftEntity::getContent).orElse("")
                 : null;
+        final var participants = gameParticipantRepository.findAllByRunIdOrderByCreatedAtAsc(run.getId())
+                .stream().map(GameParticipantEntity::toResponse).toList();
         return new GameChronicleDetailResponse(
                 context.chronicle().getId(), context.chronicle().getTitle(), context.chronicle().getStatus(),
                 context.chronicle().getCreator().getDisplayName(), context.chronicle().getCreatedAt(), run.getCompletedAt(),
                 run.getCycleCount(), run.getCurrentSequence(), turns.size(), current.id(), currentUserTurn,
                 context.narrator(), properties.narratorRevealSeconds(), currentDraft,
                 context.chronicle().getCurrentGeneratedStory() == null ? null : context.chronicle().getCurrentGeneratedStory().toResponse(),
-                turns.stream().map(GameTurnEntity::toResponse).toList(), segmentResponses
+                turns.stream().map(GameTurnEntity::toResponse).toList(), segmentResponses, participants
         );
     }
 
@@ -255,12 +260,63 @@ public class GameChronicleService {
     }
 
     @Transactional
-    public void removePartyMemberFromActiveRuns(final UUID partyId, final UUID userId) {
+    public void removePartyMemberFromActiveRuns(final UUID partyId, final UUID userId, final UserEntity actor) {
         final var chronicles = chronicleRepository.findAllByPartyIdAndTypeAndStatus(
                 partyId, ChronicleType.GAME, ChronicleStatusType.IN_PROGRESS
         );
         for (final var chronicle : chronicles) {
-            removeFromRun(chronicle, userId);
+            removeFromRun(chronicle, userId, RemovedByType.NARRATOR, actor);
+        }
+    }
+
+    @Transactional
+    public void leaveChronicle(final UUID partyId, final UUID chronicleId, final UUID targetUserId) {
+        final var context = chronicleAccessService.requireMember(partyId, chronicleId);
+        requireGameType(context.chronicle());
+        final var current = currentUserService.require();
+        final var self = targetUserId.equals(current.id());
+        if (!self && !context.narrator()) {
+            throw new ForbiddenException("Only the participant themself or a narrator can remove them from this chronicle.");
+        }
+        final var run = gameRunRepository.findForUpdateByChronicleId(chronicleId)
+                .orElseThrow(() -> new NotFoundException("Game run not found."));
+        if (run.getStatus() != GameRunStatusType.IN_PROGRESS) {
+            throw new BadRequestException("This chronicle has already finished.");
+        }
+        final var actor = userRepository.findById(current.id()).orElseThrow(() -> new NotFoundException("User not found."));
+        removeFromRun(context.chronicle(), targetUserId, self ? RemovedByType.SELF : RemovedByType.NARRATOR, actor);
+    }
+
+    @Transactional
+    public void rejoinChronicle(final UUID partyId, final UUID chronicleId, final UUID targetUserId) {
+        final var context = chronicleAccessService.requireMember(partyId, chronicleId);
+        requireGameType(context.chronicle());
+        final var run = gameRunRepository.findForUpdateByChronicleId(chronicleId)
+                .orElseThrow(() -> new NotFoundException("Game run not found."));
+        if (run.getStatus() != GameRunStatusType.IN_PROGRESS) {
+            throw new BadRequestException("This chronicle has already finished.");
+        }
+        final var participant = gameParticipantRepository.findByRunIdAndUserId(run.getId(), targetUserId)
+                .orElseThrow(() -> new NotFoundException("This user has never participated in this chronicle."));
+        if (participant.getStatus() != GameParticipantStatusType.LEFT) {
+            throw new ConflictException("This participant has not left the chronicle.");
+        }
+        final var current = currentUserService.require();
+        final var self = targetUserId.equals(current.id());
+        if (participant.getRemovedByType() == RemovedByType.NARRATOR) {
+            if (!context.narrator()) {
+                throw new ForbiddenException("Only a narrator can bring this participant back.");
+            }
+        } else if (!self && !context.narrator()) {
+            throw new ForbiddenException("Only the participant themself or a narrator can rejoin them.");
+        }
+        final var targetUser = userRepository.findById(targetUserId).orElseThrow(() -> new NotFoundException("User not found."));
+        insertIntoRun(context.chronicle(), targetUser);
+    }
+
+    private void requireGameType(final ChronicleEntity chronicle) {
+        if (chronicle.getType() != ChronicleType.GAME) {
+            throw new BadRequestException("This chronicle is not a game chronicle.");
         }
     }
 
@@ -273,6 +329,21 @@ public class GameChronicleService {
         }
         log.debug("Regeneration requested for chronicle {} by user {}.", chronicleId, context.membership().getUser().getId());
         aiJobService.enqueueRequested(context.chronicle(), context.membership().getUser());
+    }
+
+    @Transactional
+    public void reRunAi(final UUID partyId, final UUID chronicleId) {
+        final var context = chronicleAccessService.requireNarrator(partyId, chronicleId);
+        final var chronicle = context.chronicle();
+        if (chronicle.getStatus() != ChronicleStatusType.PUBLISHED && chronicle.getStatus() != ChronicleStatusType.FAILED) {
+            throw new BadRequestException("The chronicle is not ready for regeneration.");
+        }
+        aiJobService.requireConfigured();
+        final var requestedBy = context.membership().getUser();
+        aiJobService.enqueueIfIdle(chronicle, requestedBy, AiJobType.STORY_ADAPTATION_GENERATION);
+        canonMapGenerationService.enqueueGenerationIfIdle(chronicle);
+        chronicleSynopsisService.enqueueGenerationIfIdle(chronicle);
+        log.debug("Full AI re-run requested for chronicle {} by user {}.", chronicleId, requestedBy.getId());
     }
 
     @Scheduled(fixedDelay = EXPIRATION_SWEEP_MILLISECONDS)
@@ -351,6 +422,11 @@ public class GameChronicleService {
         final var run = gameRunRepository.findForUpdateByChronicleId(chronicle.getId()).orElse(null);
         if (run == null || run.getStatus() != GameRunStatusType.IN_PROGRESS) return;
 
+        final var participant = gameParticipantRepository.findByRunIdAndUserId(run.getId(), user.getId())
+                .orElseGet(() -> new GameParticipantEntity(run, user));
+        participant.markRejoined();
+        gameParticipantRepository.save(participant);
+
         final var alreadyPresentCycles = gameTurnRepository.findAllByRunIdAndUserId(run.getId(), user.getId())
                 .stream().map(GameTurnEntity::getCycleNumber).collect(Collectors.toSet());
         final var currentTurn = gameTurnRepository.findByRunIdAndSequenceNumber(run.getId(), run.getCurrentSequence())
@@ -384,9 +460,19 @@ public class GameChronicleService {
         gameTurnRepository.saveAll(byCycle.values().stream().flatMap(List::stream).toList());
     }
 
-    private void removeFromRun(final ChronicleEntity chronicle, final UUID userId) {
+    private void removeFromRun(
+            final ChronicleEntity chronicle,
+            final UUID userId,
+            final RemovedByType removedByType,
+            final UserEntity actor
+    ) {
         final var run = gameRunRepository.findForUpdateByChronicleId(chronicle.getId()).orElse(null);
         if (run == null || run.getStatus() != GameRunStatusType.IN_PROGRESS) return;
+
+        gameParticipantRepository.findByRunIdAndUserId(run.getId(), userId).ifPresent(participant -> {
+            participant.markLeft(removedByType, actor);
+            gameParticipantRepository.save(participant);
+        });
 
         final var byCycle = new TreeMap<Short, List<GameTurnEntity>>();
         for (final var turn : gameTurnRepository.findAllByRunIdOrderBySequenceNumberAsc(run.getId())) {

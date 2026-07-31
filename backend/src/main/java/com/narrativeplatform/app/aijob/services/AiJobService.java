@@ -58,6 +58,25 @@ public class AiJobService {
         log.debug("Enqueued automatic AI job {} for chronicle {}.", jobType, chronicle.getId());
     }
 
+    public void requireConfigured() {
+        openAiClient.requireConfigured();
+    }
+
+    @Transactional
+    public boolean enqueueIfIdle(final ChronicleEntity chronicle, final UserEntity requestedBy, final AiJobType jobType) {
+        if (aiJobRepository.existsByChronicleIdAndJobTypeAndStatusIn(chronicle.getId(), jobType, ACTIVE_STATUSES)) {
+            log.debug("Skipped enqueue of {} for chronicle {}: a job of this type is already active.", jobType, chronicle.getId());
+            return false;
+        }
+        final var idempotencyKey = chronicle.getId() + IDEMPOTENCY_KEY_SEPARATOR + jobType + IDEMPOTENCY_KEY_SEPARATOR + UUID.randomUUID();
+        aiJobRepository.save(new AiJobEntity(chronicle, requestedBy, idempotencyKey, jobType));
+        if (jobType == AiJobType.STORY_ADAPTATION_GENERATION) {
+            chronicle.setStatus(ChronicleStatusType.AI_PENDING);
+        }
+        log.debug("Enqueued AI job {} for chronicle {} requested by user {}.", jobType, chronicle.getId(), requestedBy.getId());
+        return true;
+    }
+
     private void enqueueInternal(final ChronicleEntity chronicle, final UserEntity requestedBy, final AiJobType jobType) {
         if (aiJobRepository.existsByChronicleIdAndJobTypeAndStatusIn(chronicle.getId(), jobType, ACTIVE_STATUSES)) {
             log.debug("Rejected AI job enqueue for chronicle {}: a job is already active.", chronicle.getId());

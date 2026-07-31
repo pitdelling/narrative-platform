@@ -77,14 +77,14 @@ public class PartyService {
 
     @Transactional
     public void removeMember(final UUID partyId, final UUID userId) {
-        partyAccessService.requireNarrator(partyId);
+        final var narratorMembership = partyAccessService.requireNarrator(partyId);
         final var membership = requireMembership(partyId, userId);
         if (membership.getRole() == PartyRoleType.OWNER) {
             throw new BadRequestException("The owner cannot be removed.");
         }
         membership.setStatus(MemberStatusType.REMOVED);
         membership.setRole(PartyRoleType.PLAYER);
-        gameChronicleService.removePartyMemberFromActiveRuns(partyId, userId);
+        gameChronicleService.removePartyMemberFromActiveRuns(partyId, userId, narratorMembership.getUser());
     }
 
     @Transactional

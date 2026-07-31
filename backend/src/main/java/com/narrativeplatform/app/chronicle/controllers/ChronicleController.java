@@ -94,6 +94,26 @@ public class ChronicleController {
         gameChronicleService.skip(partyId, chronicleId);
     }
 
+    @PostMapping("/{chronicleId}/game/participants/{userId}/leave")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void leaveGameChronicle(
+            @PathVariable("partyId") final UUID partyId,
+            @PathVariable("chronicleId") final UUID chronicleId,
+            @PathVariable("userId") final UUID userId
+    ) {
+        gameChronicleService.leaveChronicle(partyId, chronicleId, userId);
+    }
+
+    @PostMapping("/{chronicleId}/game/participants/{userId}/rejoin")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void rejoinGameChronicle(
+            @PathVariable("partyId") final UUID partyId,
+            @PathVariable("chronicleId") final UUID chronicleId,
+            @PathVariable("userId") final UUID userId
+    ) {
+        gameChronicleService.rejoinChronicle(partyId, chronicleId, userId);
+    }
+
     @PostMapping("/{chronicleId}/segments/{segmentId}/disable")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     void disableSegment(
@@ -149,6 +169,15 @@ public class ChronicleController {
             @PathVariable("chronicleId") final UUID chronicleId
     ) {
         gameChronicleService.regenerate(partyId, chronicleId);
+    }
+
+    @PostMapping("/{chronicleId}/re-run-ai")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    void reRunAi(
+            @PathVariable("partyId") final UUID partyId,
+            @PathVariable("chronicleId") final UUID chronicleId
+    ) {
+        gameChronicleService.reRunAi(partyId, chronicleId);
     }
 
     @GetMapping("/{chronicleId}/written")
