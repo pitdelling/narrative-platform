@@ -2,16 +2,15 @@ export type PartyRole = "OWNER" | "NARRATOR" | "PLAYER";
 export type ChronicleType = "WRITTEN" | "GAME";
 export type ChronicleStatus = "DRAFT" | "IN_PROGRESS" | "AI_PENDING" | "AI_PROCESSING" | "PUBLISHED" | "FAILED" | "ARCHIVED";
 
-export type CanonCategory = "PERSON" | "PLACE" | "ITEM" | "SPELL" | "CREATURE";
-export type TagColor = "GOLD" | "COPPER" | "VIOLET" | "AZURE" | "GREEN" | "ROSE" | "SLATE";
 export type TagBasis = "EXPLICIT" | "INFERRED" | "CREATIVE_FILL";
 export type CanonMapStatus = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
 export type SynopsisStatus = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
 
-export interface TagSetting {
-  category: CanonCategory;
-  enabled: boolean;
-  color: TagColor;
+export interface CanonCategory {
+  id: string;
+  name: string;
+  description?: string;
+  color: string;
   displayOrder: number;
 }
 
@@ -27,9 +26,10 @@ export interface CanonTag {
 }
 
 export interface CanonCategorySection {
-  category: CanonCategory;
-  enabled: boolean;
-  color: TagColor;
+  id: string;
+  name: string;
+  description?: string;
+  color: string;
   displayOrder: number;
   tags: CanonTag[];
 }
@@ -50,6 +50,7 @@ export interface ChronicleSynopsis {
 
 export interface AiArtifacts {
   aiConfigured: boolean;
+  adaptation: { status: ChronicleStatus };
   canonMap?: CanonMap;
   synopsis?: ChronicleSynopsis;
 }
@@ -139,6 +140,16 @@ export interface GeneratedStory {
   createdAt: string;
 }
 
+export type GameParticipantStatus = "ACTIVE" | "LEFT";
+export type RemovedByType = "SELF" | "NARRATOR";
+
+export interface GameParticipant {
+  userId: string;
+  displayName: string;
+  status: GameParticipantStatus;
+  removedByType?: RemovedByType;
+}
+
 export interface GameDetail {
   id: string;
   title: string;
@@ -157,6 +168,7 @@ export interface GameDetail {
   generatedStory?: GeneratedStory;
   turns: Turn[];
   segments: Segment[];
+  participants: GameParticipant[];
 }
 
 export interface WrittenDetail {

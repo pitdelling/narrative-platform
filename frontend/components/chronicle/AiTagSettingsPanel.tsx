@@ -2,85 +2,122 @@
 
 import { useState } from "react";
 import { api } from "@/lib/api";
-import type { CanonCategory, TagColor, TagSetting } from "@/lib/types";
-import { canonCategoryLabels } from "@/lib/format";
+import type { CanonCategory } from "@/lib/types";
 
 interface AiTagSettingsPanelProps {
   partyId: string;
   narrator: boolean;
 }
 
-const categoryOrder: CanonCategory[] = ["PERSON", "PLACE", "ITEM", "SPELL", "CREATURE"];
-const colorOptions: TagColor[] = ["GOLD", "COPPER", "VIOLET", "AZURE", "GREEN", "ROSE", "SLATE"];
+const DEFAULT_COLOR = "#7665a7";
 
-const colorLabels: Record<TagColor, string> = {
-  GOLD: "Dourado",
-  COPPER: "Cobre",
-  VIOLET: "Violeta",
-  AZURE: "Azul",
-  GREEN: "Verde",
-  ROSE: "Rosa",
-  SLATE: "Ardósia",
-};
-
-const categoryDescriptions: Record<CanonCategory, string> = {
-  PERSON: "Seres pensantes, personagens e entidades conscientes.",
-  PLACE: "Locais, ambientes, regiões e construções.",
-  ITEM: "Objetos, artefatos e elementos físicos relevantes.",
-  SPELL: "Magias, rituais, poderes e efeitos mágicos.",
-  CREATURE: "Animais, monstros e seres não pensantes.",
-};
-
-function orderByCategory(settings: TagSetting[]): TagSetting[] {
-  return categoryOrder
-    .map((category) => settings.find((item) => item.category === category))
-    .filter((item): item is TagSetting => item !== undefined);
+interface Draft {
+  name: string;
+  description: string;
+  color: string;
 }
 
+const EMPTY_DRAFT: Draft = { name: "", description: "", color: DEFAULT_COLOR };
+
 export function AiTagSettingsPanel({ partyId, narrator }: AiTagSettingsPanelProps) {
-  const [confirmed, setConfirmed] = useState<TagSetting[]>();
-  const [draft, setDraft] = useState<TagSetting[]>();
+  const [categories, setCategories] = useState<CanonCategory[]>();
   const [loaded, setLoaded] = useState(false);
-  const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
-  const [message, setMessage] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [editingId, setEditingId] = useState<string | "new" | null>(null);
+  const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
+  const [rowError, setRowError] = useState<Record<string, string>>({});
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  async function refresh() {
+    try {
+      const result = await api<CanonCategory[]>(`/parties/${partyId}/ai-tag-settings`);
+      setCategories(result);
+      setLoadError("");
+    } catch (cause) {
+      setLoadError(cause instanceof Error ? cause.message : "Não foi possível carregar as categorias.");
+    }
+  }
 
   async function load() {
     if (loaded) return;
     setLoaded(true);
+    await refresh();
+  }
+
+  function startAdd() {
+    setEditingId("new");
+    setDraft(EMPTY_DRAFT);
+  }
+
+  function startEdit(category: CanonCategory) {
+    setEditingId(category.id);
+    setDraft({ name: category.name, description: category.description ?? "", color: category.color });
+    setRowError((current) => ({ ...current, [category.id]: "" }));
+  }
+
+  function cancelEdit() {
+    if (editingId) setRowError((current) => ({ ...current, [editingId]: "" }));
+    setEditingId(null);
+    setDraft(EMPTY_DRAFT);
+  }
+
+  async function saveEdit() {
+    if (!editingId) return;
+    const key = editingId;
+    setBusyId(key);
+    setRowError((current) => ({ ...current, [key]: "" }));
     try {
-      const response = await api<{ settings: TagSetting[] }>(`/parties/${partyId}/ai-tag-settings`);
-      const ordered = orderByCategory(response.settings);
-      setConfirmed(ordered);
-      setDraft(ordered);
+      const body = JSON.stringify({
+        name: draft.name.trim(),
+        description: draft.description.trim() || undefined,
+        color: draft.color,
+      });
+      if (key === "new") {
+        await api(`/parties/${partyId}/ai-tag-settings`, { method: "POST", body });
+      } else {
+        await api(`/parties/${partyId}/ai-tag-settings/${key}`, { method: "PUT", body });
+      }
+      await refresh();
+      setEditingId(null);
+      setDraft(EMPTY_DRAFT);
     } catch (cause) {
-      setLoaded(false);
-      setStatus("error");
-      setMessage(cause instanceof Error ? cause.message : "Não foi possível carregar as configurações.");
+      setRowError((current) => ({
+        ...current,
+        [key]: cause instanceof Error ? cause.message : "Não foi possível salvar a categoria.",
+      }));
+    } finally {
+      setBusyId(null);
     }
   }
 
-  function update(category: CanonCategory, patch: Partial<TagSetting>) {
-    setDraft((current) => current?.map((item) => (item.category === category ? { ...item, ...patch } : item)));
-    setStatus("idle");
-    setMessage("");
+  async function remove(category: CanonCategory) {
+    if (!window.confirm(`Excluir a categoria "${category.name}"? Essa ação não pode ser desfeita.`)) return;
+    setBusyId(category.id);
+    try {
+      await api(`/parties/${partyId}/ai-tag-settings/${category.id}`, { method: "DELETE" });
+      await refresh();
+    } catch (cause) {
+      setRowError((current) => ({
+        ...current,
+        [category.id]: cause instanceof Error ? cause.message : "Não foi possível excluir a categoria.",
+      }));
+    } finally {
+      setBusyId(null);
+    }
   }
 
-  async function save() {
-    if (!draft) return;
-    setStatus("saving");
-    setMessage("");
+  async function move(category: CanonCategory, direction: "move-up" | "move-down") {
+    setBusyId(category.id);
     try {
-      await api(`/parties/${partyId}/ai-tag-settings`, {
-        method: "PUT",
-        body: JSON.stringify({ settings: draft }),
-      });
-      setConfirmed(draft);
-      setStatus("success");
-      setMessage("Configurações salvas.");
+      await api(`/parties/${partyId}/ai-tag-settings/${category.id}/${direction}`, { method: "POST" });
+      await refresh();
     } catch (cause) {
-      setDraft(confirmed);
-      setStatus("error");
-      setMessage(cause instanceof Error ? cause.message : "Não foi possível salvar as configurações.");
+      setRowError((current) => ({
+        ...current,
+        [category.id]: cause instanceof Error ? cause.message : "Não foi possível reordenar a categoria.",
+      }));
+    } finally {
+      setBusyId(null);
     }
   }
 
@@ -94,59 +131,156 @@ export function AiTagSettingsPanel({ partyId, narrator }: AiTagSettingsPanelProp
       }}
     >
       <summary>Tags do mapa do cânone</summary>
-      <p>Escolha quais tipos de elementos a IA deve identificar nas próximas histórias finalizadas.</p>
-      {!draft ? (
-        <p className="canon-map-state">Carregando configurações...</p>
+      <p>Crie as categorias de elementos que a IA deve identificar nas próximas histórias finalizadas.</p>
+      {!categories ? (
+        loadError ? <p className="error-message">{loadError}</p> : <p className="canon-map-state">Carregando categorias...</p>
       ) : (
         <>
-          {draft.map((setting) => (
-            <div className="tag-setting-row" key={setting.category}>
-              <label className="tag-setting-name checkbox">
-                <input
-                  type="checkbox"
-                  checked={setting.enabled}
-                  onChange={(event) => update(setting.category, { enabled: event.target.checked })}
+          {categories.length === 0 && editingId !== "new" && (
+            <p className="canon-map-state">Nenhuma categoria configurada ainda.</p>
+          )}
+          {categories.map((category, index) => (
+            <div key={category.id}>
+              {editingId === category.id ? (
+                <CategoryEditRow
+                  draft={draft}
+                  setDraft={setDraft}
+                  onSave={saveEdit}
+                  onCancel={cancelEdit}
+                  busy={busyId === category.id}
+                  error={rowError[category.id]}
                 />
-                <span>
-                  <strong>{canonCategoryLabels[setting.category]}</strong>
-                  <small>{categoryDescriptions[setting.category]}</small>
-                </span>
-              </label>
-              <label className="tag-setting-color">
-                Cor
-                <select
-                  value={setting.color}
-                  onChange={(event) => update(setting.category, { color: event.target.value as TagColor })}
-                >
-                  {colorOptions.map((color) => (
-                    <option key={color} value={color}>{colorLabels[color]}</option>
-                  ))}
-                </select>
-                <span className={`canon-color-swatch canon-color-swatch-${setting.color.toLowerCase()}`} aria-hidden="true" />
-              </label>
-              <label>
-                Ordem
-                <input
-                  className="tag-setting-order"
-                  type="number"
-                  min={0}
-                  value={setting.displayOrder}
-                  onChange={(event) => update(setting.category, { displayOrder: Number(event.target.value) })}
-                />
-              </label>
+              ) : (
+                <div className="category-row">
+                  <div className="category-row-info">
+                    <strong>{category.name}</strong>
+                    {category.description && <small>{category.description}</small>}
+                    {rowError[category.id] && <span className="error-message">{rowError[category.id]}</span>}
+                  </div>
+                  <span className="canon-color-swatch" style={{ background: category.color }} aria-hidden="true" />
+                  <div className="category-row-actions">
+                    <button
+                      type="button"
+                      className="invite-icon-button"
+                      title="Mover para cima"
+                      aria-label="Mover categoria para cima"
+                      onClick={() => move(category, "move-up")}
+                      disabled={index === 0 || busyId === category.id}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      className="invite-icon-button"
+                      title="Mover para baixo"
+                      aria-label="Mover categoria para baixo"
+                      onClick={() => move(category, "move-down")}
+                      disabled={index === categories.length - 1 || busyId === category.id}
+                    >
+                      ↓
+                    </button>
+                    <button
+                      type="button"
+                      className="invite-icon-button"
+                      title="Editar categoria"
+                      aria-label="Editar categoria"
+                      onClick={() => startEdit(category)}
+                      disabled={busyId === category.id}
+                    >
+                      ✎
+                    </button>
+                    <button
+                      type="button"
+                      className="invite-icon-button"
+                      title="Excluir categoria"
+                      aria-label="Excluir categoria"
+                      onClick={() => remove(category)}
+                      disabled={busyId === category.id}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
+          {editingId === "new" && (
+            <CategoryEditRow
+              draft={draft}
+              setDraft={setDraft}
+              onSave={saveEdit}
+              onCancel={cancelEdit}
+              busy={busyId === "new"}
+              error={rowError.new}
+            />
+          )}
           <p className="ai-tag-settings-note">
             As mudanças serão usadas em novas gerações. Mapas já gerados preservam a configuração anterior.
           </p>
-          <div className="ai-tag-settings-actions">
-            <button type="button" className="button primary" onClick={save} disabled={status === "saving"}>
-              {status === "saving" ? "Salvando..." : "Salvar configurações"}
-            </button>
-            {message && <span className={status === "error" ? "error-message" : "success-message"}>{message}</span>}
-          </div>
+          {editingId === null && (
+            <div className="ai-tag-settings-actions">
+              <button type="button" className="button secondary" onClick={startAdd}>Adicionar categoria</button>
+            </div>
+          )}
         </>
       )}
     </details>
+  );
+}
+
+interface CategoryEditRowProps {
+  draft: Draft;
+  setDraft: (draft: Draft) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  busy: boolean;
+  error?: string;
+}
+
+function CategoryEditRow({ draft, setDraft, onSave, onCancel, busy, error }: CategoryEditRowProps) {
+  return (
+    <div className="category-row-edit">
+      <input
+        type="text"
+        placeholder="Nome da categoria"
+        value={draft.name}
+        onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+        maxLength={160}
+      />
+      <input
+        type="text"
+        placeholder="Descrição (opcional)"
+        value={draft.description}
+        onChange={(event) => setDraft({ ...draft, description: event.target.value })}
+        maxLength={500}
+      />
+      <input
+        type="color"
+        aria-label="Cor da categoria"
+        value={draft.color}
+        onChange={(event) => setDraft({ ...draft, color: event.target.value })}
+      />
+      <button
+        type="button"
+        className="invite-icon-button"
+        title="Salvar categoria"
+        aria-label="Salvar categoria"
+        onClick={onSave}
+        disabled={busy || !draft.name.trim()}
+      >
+        ✓
+      </button>
+      <button
+        type="button"
+        className="invite-icon-button"
+        title="Cancelar"
+        aria-label="Cancelar edição da categoria"
+        onClick={onCancel}
+        disabled={busy}
+      >
+        ✕
+      </button>
+      {error && <span className="error-message">{error}</span>}
+    </div>
   );
 }

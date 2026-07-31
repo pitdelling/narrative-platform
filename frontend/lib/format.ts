@@ -1,4 +1,4 @@
-import type { CanonCategory, ChronicleStatus, TagBasis, Turn } from "@/lib/types";
+import type { ChronicleStatus, TagBasis, Turn } from "@/lib/types";
 
 export function formatDate(iso: string): string {
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "long" }).format(new Date(iso));
@@ -24,14 +24,6 @@ export const turnStatusLabels: Record<Turn["status"], string> = {
   SUBMITTED: "Enviado",
   SKIPPED: "Pulado",
   EXPIRED: "Expirado",
-};
-
-export const canonCategoryLabels: Record<CanonCategory, string> = {
-  PERSON: "Pessoas",
-  PLACE: "Lugares",
-  ITEM: "Itens",
-  SPELL: "Magias",
-  CREATURE: "Criaturas",
 };
 
 export const tagBasisLabels: Record<TagBasis, string> = {

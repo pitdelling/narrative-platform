@@ -1,26 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
 import type { AiArtifacts, CanonCategorySection, CanonTag, TagBasis } from "@/lib/types";
-import { canonCategoryLabels, tagBasisLabels } from "@/lib/format";
+import { tagBasisLabels } from "@/lib/format";
 
 interface CanonMapPanelProps {
-  partyId: string;
-  chronicleId: string;
+  artifacts?: AiArtifacts;
   finished: boolean;
 }
 
-export function CanonMapPanel({ partyId, chronicleId, finished }: CanonMapPanelProps) {
-  const [artifacts, setArtifacts] = useState<AiArtifacts>();
-
-  useEffect(() => {
-    if (!finished) return;
-    api<AiArtifacts>(`/parties/${partyId}/chronicles/${chronicleId}/ai-artifacts`)
-      .then((result) => setArtifacts(result))
-      .catch(() => setArtifacts(undefined));
-  }, [partyId, chronicleId, finished]);
-
+export function CanonMapPanel({ artifacts, finished }: CanonMapPanelProps) {
   if (!finished) return null;
 
   return (
@@ -59,23 +47,21 @@ function CanonMapBody({ artifacts }: { artifacts?: AiArtifacts }) {
     );
   }
 
-  const enabledCategories = canonMap.categories
-    .filter((category) => category.enabled)
-    .sort((a, b) => a.displayOrder - b.displayOrder);
+  const sortedCategories = [...canonMap.categories].sort((a, b) => a.displayOrder - b.displayOrder);
 
-  if (enabledCategories.length === 0) {
-    return <p className="canon-map-state">A extração de tags está desativada para esta party.</p>;
+  if (sortedCategories.length === 0) {
+    return <p className="canon-map-state">Nenhuma categoria de mapa do cânone foi configurada para esta party.</p>;
   }
 
-  const totalTags = enabledCategories.reduce((sum, category) => sum + category.tags.length, 0);
+  const totalTags = sortedCategories.reduce((sum, category) => sum + category.tags.length, 0);
   if (totalTags === 0) {
     return <p className="canon-map-state">Nenhum elemento foi identificado nas categorias configuradas.</p>;
   }
 
   return (
     <>
-      {enabledCategories.map((category) => (
-        <CategorySection key={category.category} category={category} />
+      {sortedCategories.map((category) => (
+        <CategorySection key={category.id} category={category} />
       ))}
     </>
   );
@@ -85,8 +71,8 @@ function CategorySection({ category }: { category: CanonCategorySection }) {
   return (
     <div className="canon-category-section">
       <div className="canon-category-heading">
-        <span className={`canon-color-swatch canon-color-swatch-${category.color.toLowerCase()}`} aria-hidden="true" />
-        <span>{canonCategoryLabels[category.category]}</span>
+        <span className="canon-color-swatch" style={{ background: category.color }} aria-hidden="true" />
+        <span>{category.name}</span>
         <span className="canon-category-count">{category.tags.length}</span>
       </div>
       {category.tags.length === 0 ? (
