@@ -1,6 +1,5 @@
 package com.narrativeplatform.app.canon.services;
 
-import com.narrativeplatform.app.canon.models.enums.CanonCategoryType;
 import com.narrativeplatform.app.canon.models.enums.TagBasisType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -8,8 +7,8 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.ArrayList;
-import java.util.EnumMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -27,9 +26,9 @@ public class CanonMapValidationService {
 
     private final ObjectMapper objectMapper;
 
-    public Map<CanonCategoryType, List<ValidatedCanonTag>> validate(
+    public Map<String, List<ValidatedCanonTag>> validate(
             final String rawText,
-            final Set<CanonCategoryType> enabledCategories,
+            final Set<String> validCategoryNames,
             final Set<Integer> validSequenceNumbers
     ) {
         final JsonNode root;
@@ -42,33 +41,28 @@ public class CanonMapValidationService {
             throw new CanonMapValidationException("AI output was not a JSON object.");
         }
 
-        final Map<CanonCategoryType, List<ValidatedCanonTag>> result = new EnumMap<>(CanonCategoryType.class);
+        final Map<String, List<ValidatedCanonTag>> result = new LinkedHashMap<>();
         final var fieldNames = root.propertyNames();
         for (final var fieldName : fieldNames) {
-            final CanonCategoryType category;
-            try {
-                category = CanonCategoryType.valueOf(fieldName);
-            } catch (final IllegalArgumentException exception) {
+            final var normalizedCategory = normalize(fieldName);
+            if (!validCategoryNames.contains(normalizedCategory)) {
                 throw new CanonMapValidationException("AI output contained an unknown category: " + fieldName + ".");
-            }
-            if (!enabledCategories.contains(category)) {
-                throw new CanonMapValidationException("AI output contained a category that is not enabled: " + fieldName + ".");
             }
             final var value = root.path(fieldName);
             if (!value.isArray()) {
                 throw new CanonMapValidationException("Category " + fieldName + " must map to an array.");
             }
-            result.put(category, validateItems(category, value, validSequenceNumbers));
+            result.put(normalizedCategory, validateItems(fieldName, value, validSequenceNumbers));
         }
 
-        for (final var category : enabledCategories) {
+        for (final var category : validCategoryNames) {
             result.putIfAbsent(category, List.of());
         }
         return result;
     }
 
     private List<ValidatedCanonTag> validateItems(
-            final CanonCategoryType category,
+            final String category,
             final JsonNode items,
             final Set<Integer> validSequenceNumbers
     ) {
@@ -160,7 +154,7 @@ public class CanonMapValidationService {
         return HTML_LIKE.matcher(value).find();
     }
 
-    private String normalize(final String name) {
+    public static String normalize(final String name) {
         return name.trim().toLowerCase().replaceAll("\\s+", " ");
     }
 

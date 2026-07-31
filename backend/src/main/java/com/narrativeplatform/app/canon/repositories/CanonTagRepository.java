@@ -7,5 +7,5 @@ import java.util.List;
 import java.util.UUID;
 
 public interface CanonTagRepository extends JpaRepository<CanonTagEntity, UUID> {
-    List<CanonTagEntity> findAllByGenerationIdOrderByCategoryAscDisplayOrderAsc(UUID generationId);
+    List<CanonTagEntity> findAllByGenerationIdOrderByCategorySnapshotDisplayOrderAscDisplayOrderAsc(UUID generationId);
 }

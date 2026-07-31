@@ -5,10 +5,11 @@ import com.narrativeplatform.app.aijob.services.AiJobService;
 import com.narrativeplatform.app.canon.models.entities.CanonMapGenerationCategoryEntity;
 import com.narrativeplatform.app.canon.models.entities.CanonMapGenerationEntity;
 import com.narrativeplatform.app.canon.models.entities.CanonTagEntity;
-import com.narrativeplatform.app.canon.models.enums.CanonCategoryType;
+import com.narrativeplatform.app.canon.models.enums.CanonMapStatusType;
 import com.narrativeplatform.app.canon.models.responses.CanonCategoryResponse;
 import com.narrativeplatform.app.canon.models.responses.CanonMapResponse;
 import com.narrativeplatform.app.canon.models.responses.CanonTagResponse;
+import com.narrativeplatform.app.canon.repositories.CanonCategoryRepository;
 import com.narrativeplatform.app.canon.repositories.CanonMapGenerationCategoryRepository;
 import com.narrativeplatform.app.canon.repositories.CanonMapGenerationRepository;
 import com.narrativeplatform.app.canon.repositories.CanonTagRepository;
@@ -34,21 +35,31 @@ public class CanonMapGenerationService {
     private final CanonMapGenerationCategoryRepository canonMapGenerationCategoryRepository;
     private final CanonTagRepository canonTagRepository;
     private final CanonTagSourceRepository canonTagSourceRepository;
-    private final PartyAiTagSettingsService partyAiTagSettingsService;
+    private final CanonCategoryRepository canonCategoryRepository;
     private final AiJobService aiJobService;
 
     @Transactional
     public void enqueueGeneration(final ChronicleEntity chronicle) {
-        final var settings = partyAiTagSettingsService.getOrCreateDefaults(chronicle.getParty().getId());
+        final var categories = canonCategoryRepository.findAllByPartyIdOrderByDisplayOrderAsc(chronicle.getParty().getId());
         final var version = Math.toIntExact(canonMapGenerationRepository.countByChronicleId(chronicle.getId()) + 1);
         final var generation = canonMapGenerationRepository.save(new CanonMapGenerationEntity(chronicle, version));
-        final var categorySnapshots = settings.stream()
-                .map(setting -> new CanonMapGenerationCategoryEntity(
-                        generation, setting.getCategory(), setting.isEnabled(), setting.getColor(), setting.getDisplayOrder()
+        final var categorySnapshots = categories.stream()
+                .map(category -> new CanonMapGenerationCategoryEntity(
+                        generation, category.getName(), category.getDescription(), category.getColor(), category.getDisplayOrder()
                 ))
                 .toList();
         canonMapGenerationCategoryRepository.saveAll(categorySnapshots);
         aiJobService.enqueueAutomatic(chronicle, AiJobType.CANON_MAP_GENERATION, chronicle.getCreator());
+    }
+
+    @Transactional
+    public boolean enqueueGenerationIfIdle(final ChronicleEntity chronicle) {
+        final var latest = canonMapGenerationRepository.findFirstByChronicleIdOrderByVersionNumberDesc(chronicle.getId()).orElse(null);
+        if (latest != null && (latest.getStatus() == CanonMapStatusType.PENDING || latest.getStatus() == CanonMapStatusType.PROCESSING)) {
+            return false;
+        }
+        enqueueGeneration(chronicle);
+        return true;
     }
 
     public CanonMapResponse getForChronicle(final UUID chronicleId) {
@@ -57,20 +68,20 @@ public class CanonMapGenerationService {
             return null;
         }
         final var categorySnapshots = canonMapGenerationCategoryRepository.findAllByGenerationIdOrderByDisplayOrderAsc(generation.getId());
-        final var tags = canonTagRepository.findAllByGenerationIdOrderByCategoryAscDisplayOrderAsc(generation.getId());
+        final var tags = canonTagRepository.findAllByGenerationIdOrderByCategorySnapshotDisplayOrderAscDisplayOrderAsc(generation.getId());
         final var positionsByTagId = new HashMap<UUID, List<Integer>>();
         for (final var position : canonTagSourceRepository.findPositionsByGenerationId(generation.getId())) {
             positionsByTagId.computeIfAbsent(position.getTagId(), key -> new ArrayList<>()).add(position.getSequenceNumber());
         }
         positionsByTagId.values().forEach(Collections::sort);
 
-        final Map<CanonCategoryType, List<CanonTagEntity>> tagsByCategory = tags.stream()
-                .collect(Collectors.groupingBy(CanonTagEntity::getCategory, LinkedHashMap::new, Collectors.toList()));
+        final Map<UUID, List<CanonTagEntity>> tagsByCategoryId = tags.stream()
+                .collect(Collectors.groupingBy(tag -> tag.getCategorySnapshot().getId(), LinkedHashMap::new, Collectors.toList()));
 
         final var categories = categorySnapshots.stream()
                 .map(snapshot -> new CanonCategoryResponse(
-                        snapshot.getCategory(), snapshot.isEnabled(), snapshot.getColor(), snapshot.getDisplayOrder(),
-                        tagsByCategory.getOrDefault(snapshot.getCategory(), List.of()).stream()
+                        snapshot.getId(), snapshot.getName(), snapshot.getDescription(), snapshot.getColor(), snapshot.getDisplayOrder(),
+                        tagsByCategoryId.getOrDefault(snapshot.getId(), List.of()).stream()
                                 .map(tag -> new CanonTagResponse(
                                         tag.getId(), tag.getName(), tag.getSummary(), tag.getVisualDescription(),
                                         tag.getPersonalityDescription(), tag.getVisualBasis(), tag.getPersonalityBasis(),

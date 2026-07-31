@@ -1,8 +1,6 @@
 package com.narrativeplatform.app.canon.models.entities;
 
-import com.narrativeplatform.app.canon.models.enums.CanonCategoryType;
-import com.narrativeplatform.app.canon.models.enums.TagColorType;
-import com.narrativeplatform.app.canon.models.responses.TagSettingResponseItem;
+import com.narrativeplatform.app.canon.models.responses.CanonCategoryConfigResponse;
 import com.narrativeplatform.app.party.models.entities.PartyEntity;
 import jakarta.persistence.*;
 import lombok.*;
@@ -17,8 +15,8 @@ import java.util.UUID;
 @ToString
 @NoArgsConstructor
 @Entity
-@Table(name = "party_ai_tag_settings", uniqueConstraints = @UniqueConstraint(columnNames = {"party_id", "category"}))
-public class PartyAiTagSettingEntity {
+@Table(name = "canon_categories")
+public class CanonCategoryEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
@@ -28,16 +26,14 @@ public class PartyAiTagSettingEntity {
     @ToString.Exclude
     private PartyEntity party;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
-    private CanonCategoryType category;
+    @Column(nullable = false, length = 160)
+    private String name;
 
-    @Column(nullable = false)
-    private boolean enabled;
+    @Column(length = 500)
+    private String description;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
-    private TagColorType color;
+    @Column(nullable = false, length = 7)
+    private String color;
 
     @Column(name = "display_order", nullable = false)
     private int displayOrder;
@@ -50,21 +46,21 @@ public class PartyAiTagSettingEntity {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    public PartyAiTagSettingEntity(
+    public CanonCategoryEntity(
             final PartyEntity party,
-            final CanonCategoryType category,
-            final boolean enabled,
-            final TagColorType color,
+            final String name,
+            final String description,
+            final String color,
             final int displayOrder
     ) {
         this.party = party;
-        this.category = category;
-        this.enabled = enabled;
+        this.name = name;
+        this.description = description;
         this.color = color;
         this.displayOrder = displayOrder;
     }
 
-    public TagSettingResponseItem toResponse() {
-        return new TagSettingResponseItem(category, enabled, color, displayOrder);
+    public CanonCategoryConfigResponse toResponse() {
+        return new CanonCategoryConfigResponse(id, name, description, color, displayOrder);
     }
 }

@@ -1,8 +1,6 @@
 package com.narrativeplatform.app.canon.models.entities;
 
-import com.narrativeplatform.app.canon.models.enums.CanonCategoryType;
 import com.narrativeplatform.app.canon.models.enums.TagBasisType;
-import com.narrativeplatform.app.canon.models.enums.TagColorType;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -15,7 +13,7 @@ import java.util.UUID;
 @ToString
 @NoArgsConstructor
 @Entity
-@Table(name = "canon_tags", uniqueConstraints = @UniqueConstraint(columnNames = {"generation_id", "category", "normalized_name"}))
+@Table(name = "canon_tags", uniqueConstraints = @UniqueConstraint(columnNames = {"generation_id", "category_snapshot_id", "normalized_name"}))
 public class CanonTagEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -26,13 +24,10 @@ public class CanonTagEntity {
     @ToString.Exclude
     private CanonMapGenerationEntity generation;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
-    private CanonCategoryType category;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
-    private TagColorType color;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "category_snapshot_id")
+    @ToString.Exclude
+    private CanonMapGenerationCategoryEntity categorySnapshot;
 
     @Column(name = "display_order", nullable = false)
     private int displayOrder;
@@ -66,8 +61,7 @@ public class CanonTagEntity {
 
     public CanonTagEntity(
             final CanonMapGenerationEntity generation,
-            final CanonCategoryType category,
-            final TagColorType color,
+            final CanonMapGenerationCategoryEntity categorySnapshot,
             final int displayOrder,
             final String name,
             final String normalizedName,
@@ -78,8 +72,7 @@ public class CanonTagEntity {
             final TagBasisType personalityBasis
     ) {
         this.generation = generation;
-        this.category = category;
-        this.color = color;
+        this.categorySnapshot = categorySnapshot;
         this.displayOrder = displayOrder;
         this.name = name;
         this.normalizedName = normalizedName;
