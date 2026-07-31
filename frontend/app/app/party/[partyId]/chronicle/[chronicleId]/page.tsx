@@ -1,15 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
 import { turnProgress } from "@/lib/progress";
+import { useAiArtifacts } from "@/lib/useAiArtifacts";
 import type { GameDetail, PartyDetail, Segment, WrittenDetail } from "@/lib/types";
 import { AppShell } from "@/components/AppShell";
+import { AiProcessingTimer } from "@/components/chronicle/AiProcessingTimer";
 import { ChronicleCompletedHeader } from "@/components/chronicle/ChronicleCompletedHeader";
 import { CanonMapPanel } from "@/components/chronicle/CanonMapPanel";
 import { GameProgressBar } from "@/components/chronicle/GameProgressBar";
+import { ParticipantsPanel } from "@/components/chronicle/ParticipantsPanel";
 import { StoryModal } from "@/components/chronicle/StoryModal";
 import { ThreadSegmentRow } from "@/components/chronicle/ThreadSegmentRow";
 
@@ -33,6 +36,9 @@ function GameView({ partyId, chronicleId }: { partyId: string; chronicleId: stri
   const [revealed, setRevealed] = useState(false);
   const [message, setMessage] = useState("");
   const [storyModalOpen, setStoryModalOpen] = useState(false);
+  const [refreshToken, setRefreshToken] = useState(0);
+  const [aiStartedAt, setAiStartedAt] = useState<number>();
+  const previousProcessing = useRef(false);
 
   const load = useCallback(async (reveal = false) => {
     try {
@@ -70,6 +76,21 @@ function GameView({ partyId, chronicleId }: { partyId: string; chronicleId: stri
 
   const progress = useMemo(() => turnProgress(data?.turns ?? []), [data]);
 
+  const finished = data ? data.status !== "IN_PROGRESS" : false;
+  const { artifacts, processing } = useAiArtifacts(partyId, chronicleId, finished, refreshToken);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      if (processing && !previousProcessing.current) setAiStartedAt(Date.now());
+      if (!processing && previousProcessing.current) {
+        setAiStartedAt(undefined);
+        void load(revealed);
+      }
+      previousProcessing.current = processing;
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [processing, revealed, load]);
+
   async function action(path: string, body?: unknown, method = "POST") {
     setMessage("");
     try {
@@ -78,6 +99,7 @@ function GameView({ partyId, chronicleId }: { partyId: string; chronicleId: stri
         body: body ? JSON.stringify(body) : undefined,
       });
       await load(revealed);
+      setRefreshToken((token) => token + 1);
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "A ação falhou.");
     }
@@ -119,23 +141,43 @@ function GameView({ partyId, chronicleId }: { partyId: string; chronicleId: stri
 
   if (!data || !party) return <p>Consultando a crônica...</p>;
 
-  const finished = data.status !== "IN_PROGRESS";
-  // "Re-executar IA" only re-triggers the literary adaptation (data.status here reflects the
-  // adaptation pipeline specifically). The canon map and synopsis run independently and have
-  // no manual regeneration action in this console.
+  // "Re-executar IA" (header button) re-runs synopsis + canon map + adaptation together.
+  // "Regenerar história" (inside StoryModal) only re-runs the adaptation — see StoryModal's onRegenerate.
   const canRegenerate = data.narrator && ["PUBLISHED", "FAILED"].includes(data.status);
   const isRegenerating = data.narrator && ["AI_PENDING", "AI_PROCESSING"].includes(data.status);
+  const me = data.participants.find((participant) => participant.userId === data.currentUserId);
 
   const headerActions = (
     <>
       {data.narrator && data.status === "IN_PROGRESS" && <button className="button secondary" onClick={() => action("/game/skip")}>Pular turno atual</button>}
       {data.narrator && data.status === "IN_PROGRESS" && <button className="button secondary" onClick={reveal} disabled={revealed}>{revealed ? `Revelado por ${data.revealSeconds}s` : "Revelar todos os trechos"}</button>}
+      {!data.narrator && data.status === "IN_PROGRESS" && (
+        me?.status === "LEFT"
+          ? me.removedByType === "SELF" && (
+              <button className="button secondary" onClick={() => action(`/game/participants/${data.currentUserId}/rejoin`)}>
+                Voltar para a história
+              </button>
+            )
+          : (
+              <button
+                className="button danger-outline"
+                onClick={() => {
+                  if (window.confirm("Sair desta história-jogo? Você deixará de participar dos próximos ciclos, mas seus trechos já escritos continuam no registro. Você poderá voltar clicando em \"Voltar para a história\".")) {
+                    action(`/game/participants/${data.currentUserId}/leave`);
+                  }
+                }}
+              >
+                Sair da história
+              </button>
+            )
+      )}
       {finished && <button className="button primary" onClick={() => setStoryModalOpen(true)}>Ver história adaptada</button>}
       {(canRegenerate || isRegenerating) && (
-        <button className="button secondary" onClick={() => action("/regenerate")} disabled={isRegenerating}>
+        <button className="button secondary" onClick={() => action("/re-run-ai")} disabled={isRegenerating}>
           {isRegenerating ? "Gerando..." : "Re-executar IA"}
         </button>
       )}
+      <AiProcessingTimer processing={processing} startedAt={aiStartedAt} />
       {data.narrator && <button className="button ghost" onClick={() => api(`/parties/${partyId}/chronicles/${chronicleId}`, { method: "DELETE" }).then(() => { window.location.href = `/app/party/${partyId}`; })}>Arquivar</button>}
     </>
   );
@@ -168,6 +210,32 @@ function GameView({ partyId, chronicleId }: { partyId: string; chronicleId: stri
         </header>
       )}
 
+      {!finished && data.narrator && (
+        <ParticipantsPanel
+          participants={data.participants}
+          currentUserId={data.currentUserId}
+          narrator={data.narrator}
+          onLeave={(userId) => action(`/game/participants/${userId}/leave`)}
+          onRejoin={(userId) => action(`/game/participants/${userId}/rejoin`)}
+        />
+      )}
+
+      {!finished && me?.status === "LEFT" && (
+        <aside className="chronicle-left-notice">
+          <p>
+            Parece que um caçador de recompensas te rendeu e prendeu os seus braços — por isso você não consegue mais escrever nesta história.
+            {me.removedByType === "NARRATOR"
+              ? " Peça para o narrador te soltar das amarras para voltar a participar."
+              : " Mas ele não está de olho... aproveite e solte-se sozinho clicando em \"Voltar para a história\"!"}
+          </p>
+          {me.removedByType === "SELF" && (
+            <button className="button secondary" onClick={() => action(`/game/participants/${data.currentUserId}/rejoin`)}>
+              Voltar para a história
+            </button>
+          )}
+        </aside>
+      )}
+
       {data.currentUserTurn && (
         <section className="turn-editor turn-composer card">
           <p className="eyebrow">É a sua vez</p>
@@ -189,7 +257,7 @@ function GameView({ partyId, chronicleId }: { partyId: string; chronicleId: stri
         </section>
       )}
 
-      {finished && <CanonMapPanel partyId={partyId} chronicleId={chronicleId} finished={finished} />}
+      {finished && <CanonMapPanel artifacts={artifacts} finished={finished} />}
 
       <section className="thread" aria-labelledby="thread-heading">
         <div className="section-heading">

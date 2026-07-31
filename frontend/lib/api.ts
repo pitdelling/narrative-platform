@@ -12,12 +12,32 @@ export class ApiError extends Error {
   }
 }
 
+export class NetworkError extends Error {
+  constructor() {
+    super("Não foi possível falar com o servidor.");
+  }
+}
+
+const BACKEND_DOWN_PATH = "/backend-down";
+
+function redirectToBackendDown() {
+  if (typeof window === "undefined") return;
+  if (window.location.pathname === BACKEND_DOWN_PATH) return;
+  window.location.assign(BACKEND_DOWN_PATH);
+}
+
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   if (!headers.has("Content-Type") && init.body) headers.set("Content-Type", "application/json");
   const token = getToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
-  const response = await fetch(`${API_URL}${path}`, { ...init, headers, cache: "no-store" });
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}${path}`, { ...init, headers, cache: "no-store" });
+  } catch {
+    redirectToBackendDown();
+    throw new NetworkError();
+  }
   if (!response.ok) {
     let message = `Request failed (${response.status}).`;
     let code: string | undefined;

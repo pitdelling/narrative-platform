@@ -153,7 +153,15 @@ export default function PartyArchivePage() {
         </div>
         <div className="header-top">
           <div className="header-actions">
-            <button className="button primary" onClick={() => setShowCreate(!showCreate)}>✎ Registrar crônica</button>
+            <button
+              className="button primary registrar-cronica-button"
+              onClick={() => setShowCreate(!showCreate)}
+              title="Registrar crônica"
+              aria-label="Registrar crônica"
+            >
+              <span aria-hidden="true">✎</span>
+              <span className="registrar-cronica-label">Registrar crônica</span>
+            </button>
           </div>
         </div>
       </header>

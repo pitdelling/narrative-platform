@@ -4,7 +4,7 @@ import type { FormEvent, ReactNode } from "react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { api } from "@/lib/api";
+import { api, NetworkError } from "@/lib/api";
 import { clearToken } from "@/lib/auth";
 import { BrandMark } from "@/components/BrandMark";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -44,8 +44,9 @@ export function AppShell({ children, partyId }: { children: ReactNode; partyId?:
       .then((user) => {
         if (active) setCurrentUser(user);
       })
-      .catch(() => {
+      .catch((cause) => {
         if (!active) return;
+        if (cause instanceof NetworkError) return;
         clearToken();
         router.push("/");
       });
@@ -138,7 +139,9 @@ export function AppShell({ children, partyId }: { children: ReactNode; partyId?:
         <div className="desktop-brand"><BrandMark /></div>
         <nav>
           <div className="nav-group">
-            <Link className={pathname === "/app" ? "active" : ""} href="/app" onClick={closeMenu}>◈ {groupsLabel}</Link>
+            <Link className={pathname === "/app" ? "active" : ""} href="/app" onClick={closeMenu} title={groupsLabel}>
+              ◈ <span className="nav-label-text">{groupsLabel}</span>
+            </Link>
             {archiveHref && <Link className={`nav-subitem ${archiveActive ? "active" : ""}`} href={archiveHref} onClick={closeMenu}>✦ Histórias</Link>}
           </div>
           <span className="disabled-nav">◌ Personagens <em>em breve</em></span>
