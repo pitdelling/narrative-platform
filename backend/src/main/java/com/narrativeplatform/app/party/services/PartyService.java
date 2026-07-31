@@ -104,7 +104,7 @@ public class PartyService {
             final UUID userId,
             final UpdateMemberRoleRequest request
     ) {
-        partyAccessService.requireOwner(partyId);
+        final var ownerMembership = partyAccessService.requireOwner(partyId);
         final var membership = requireMembership(partyId, userId);
         if (membership.getRole() == PartyRoleType.OWNER) {
             throw new BadRequestException("The owner role can only be changed by transferring the party.");
@@ -115,7 +115,13 @@ public class PartyService {
         if (request.role() == PartyRoleType.OWNER) {
             throw new BadRequestException("Use the transfer operation to assign a new owner.");
         }
+        final var previousRole = membership.getRole();
         membership.setRole(request.role());
+        if (request.role() == PartyRoleType.SPECTATOR && previousRole != PartyRoleType.SPECTATOR) {
+            gameChronicleService.removePartyMemberFromActiveRuns(partyId, userId, ownerMembership.getUser());
+        } else if (previousRole == PartyRoleType.SPECTATOR && request.role() != PartyRoleType.SPECTATOR) {
+            gameChronicleService.insertPartyMemberIntoActiveRuns(partyId, userId);
+        }
     }
 
     @Transactional

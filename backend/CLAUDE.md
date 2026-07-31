@@ -81,11 +81,11 @@ Override of the generic parent mapper rule:
 
 ## Domain Invariants
 
-- A user has no global player role. Membership roles exist only inside a party.
+- A user has no global player role. Membership roles exist only inside a party. Roles are `OWNER`, `NARRATOR`, `PLAYER`, and `SPECTATOR` — a spectator can view every chronicle but is never selected as a game-chronicle participant and never receives turns.
 - Public registration creates a user capable of creating narrator-owned parties.
-- Player membership can only be created by accepting a valid invitation.
-- Each party has exactly one reusable invitation link, identified by an opaque bearer token. Only an active narrator or the owner may view or regenerate it; regenerating it invalidates the previous token immediately and never leaves more than one active link per party. The raw token is persisted (not hash-only) so it can be redisplayed to authorized viewers on demand; `token_hash` is what the public resolution/acceptance endpoints actually query against, so that path never needs read access to the raw value. This is a deliberate trade-off — see `PartyInvitationLinkEntity`'s Javadoc.
-- Game-story ordering is generated and persisted by the backend. The creator is first; remaining active participants are shuffled once. The same order repeats for every cycle.
+- Party membership can only be created by accepting a valid invitation; the invitation link's target role determines the new member's initial role (`PLAYER` or `SPECTATOR`).
+- Each party has exactly one reusable invitation link **per target role** (`PLAYER` and `SPECTATOR`), each identified by its own opaque bearer token, enforced by `UNIQUE(party_id, target_role)`. Only an active narrator or the owner may view or regenerate either link; regenerating one invalidates its previous token immediately and never leaves more than one active link per (party, target role). The raw token is persisted (not hash-only) so it can be redisplayed to authorized viewers on demand; `token_hash` is what the public resolution/acceptance endpoints actually query against, so that path never needs read access to the raw value. This is a deliberate trade-off — see `PartyInvitationLinkEntity`'s Javadoc.
+- Game-story ordering is generated and persisted by the backend, from active non-spectator members only. The creator is first; remaining active participants are shuffled once. The same order repeats for every cycle.
 - A game can have one, two or three cycles.
 - Game creation requires the creator's opening segment. The opening turn is persisted as submitted during creation, and the next participant becomes active immediately.
 - A participant can submit only when it is their active turn.
@@ -94,7 +94,7 @@ Override of the generic parent mapper rule:
 - Narrator reveal is permission-based. The frontend hides it after ten seconds, but the backend treats revealed data as intentionally disclosed to the narrator.
 - Published threads show disabled segments in gray, with `Removed by narrator` and an optional reason.
 - `DISABLED` membership is temporary and can be reactivated. `REMOVED` membership is permanent for that membership lifecycle and requires a new invitation; historical attribution remains.
-- Only the owner can promote a player to narrator or demote a narrator to player. Transferring ownership demotes the former owner to player.
+- Only the owner can change a member's role between `PLAYER`, `NARRATOR` and `SPECTATOR`. Transferring ownership demotes the former owner to player. Converting a member to `SPECTATOR` removes them from every in-progress game chronicle's remaining turns (past segments are preserved); converting a spectator back to `PLAYER`/`NARRATOR` reinserts them into those same chronicles' remaining cycles, exactly like a reactivation.
 - AI input includes only active or edited segments, never disabled segments.
 - Skip and expiry remove the participant only from that turn. They can participate in later cycles.
 - Written chronicles use an exclusive 24-hour editing lock. Saves with an expired or mismatched lock token must be rejected.

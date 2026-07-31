@@ -2,6 +2,7 @@ package com.narrativeplatform.app.party.repositories;
 
 import com.narrativeplatform.app.party.models.entities.PartyMemberEntity;
 import com.narrativeplatform.app.party.models.enums.MemberStatusType;
+import com.narrativeplatform.app.party.models.enums.PartyRoleType;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -21,4 +22,7 @@ public interface PartyMemberRepository extends JpaRepository<PartyMemberEntity, 
 
     @EntityGraph(attributePaths = "user")
     List<PartyMemberEntity> findAllByPartyIdAndStatusOrderByJoinedAtAsc(UUID partyId, MemberStatusType status);
+
+    @EntityGraph(attributePaths = "user")
+    List<PartyMemberEntity> findAllByPartyIdAndStatusAndRoleNotOrderByJoinedAtAsc(UUID partyId, MemberStatusType status, PartyRoleType role);
 }

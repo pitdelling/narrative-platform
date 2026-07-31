@@ -1,6 +1,7 @@
 package com.narrativeplatform.app.invitation.repositories;
 
 import com.narrativeplatform.app.invitation.models.entities.PartyInvitationLinkEntity;
+import com.narrativeplatform.app.party.models.enums.PartyRoleType;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -15,7 +16,17 @@ public interface PartyInvitationLinkRepository extends JpaRepository<PartyInvita
     @EntityGraph(attributePaths = {"party", "createdBy"})
     Optional<PartyInvitationLinkEntity> findByTokenHash(String tokenHash);
 
+    @EntityGraph(attributePaths = {"party", "createdBy"})
+    @Query("select l from PartyInvitationLinkEntity l where l.party.id = :partyId and l.targetRole = :targetRole")
+    Optional<PartyInvitationLinkEntity> findByPartyIdAndTargetRole(
+            @Param("partyId") UUID partyId,
+            @Param("targetRole") PartyRoleType targetRole
+    );
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select l from PartyInvitationLinkEntity l where l.partyId = :partyId")
-    Optional<PartyInvitationLinkEntity> findForUpdateById(@Param("partyId") UUID partyId);
+    @Query("select l from PartyInvitationLinkEntity l where l.party.id = :partyId and l.targetRole = :targetRole")
+    Optional<PartyInvitationLinkEntity> findForUpdateByPartyIdAndTargetRole(
+            @Param("partyId") UUID partyId,
+            @Param("targetRole") PartyRoleType targetRole
+    );
 }

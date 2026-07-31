@@ -39,17 +39,17 @@ public class InvitationService {
     private final AppProperties properties;
 
     @Transactional
-    public PartyInvitationLinkResponse getCurrentLink(final UUID partyId) {
+    public PartyInvitationLinkResponse getCurrentLink(final UUID partyId, final PartyRoleType targetRole) {
         final var membership = partyAccessService.requireNarrator(partyId);
-        final var link = linkRepository.findById(partyId)
-                .orElseGet(() -> getOrCreateForUpdate(membership.getParty(), membership.getUser()));
+        final var link = linkRepository.findByPartyIdAndTargetRole(partyId, targetRole)
+                .orElseGet(() -> getOrCreateForUpdate(membership.getParty(), membership.getUser(), targetRole));
         return toResponse(link);
     }
 
     @Transactional
-    public PartyInvitationLinkResponse regenerateLink(final UUID partyId) {
+    public PartyInvitationLinkResponse regenerateLink(final UUID partyId, final PartyRoleType targetRole) {
         final var membership = partyAccessService.requireNarrator(partyId);
-        final var link = getOrCreateForUpdate(membership.getParty(), membership.getUser());
+        final var link = getOrCreateForUpdate(membership.getParty(), membership.getUser(), targetRole);
         final var rawToken = TokenUtils.randomToken();
         link.rotate(rawToken, TokenUtils.sha256(rawToken), membership.getUser());
         return toResponse(link);
@@ -57,8 +57,10 @@ public class InvitationService {
 
     @Transactional
     public void createInitialLink(final PartyEntity party, final UserEntity owner) {
-        final var rawToken = TokenUtils.randomToken();
-        linkRepository.save(new PartyInvitationLinkEntity(party, rawToken, TokenUtils.sha256(rawToken), owner));
+        for (final var targetRole : new PartyRoleType[] {PartyRoleType.PLAYER, PartyRoleType.SPECTATOR}) {
+            final var rawToken = TokenUtils.randomToken();
+            linkRepository.save(new PartyInvitationLinkEntity(party, targetRole, rawToken, TokenUtils.sha256(rawToken), owner));
+        }
     }
 
     public InvitePreviewResponse preview(final String rawToken) {
@@ -85,9 +87,9 @@ public class InvitationService {
         if (existing.isPresent()) {
             final var membership = existing.get();
             membership.setStatus(MemberStatusType.ACTIVE);
-            membership.setRole(PartyRoleType.PLAYER);
+            membership.setRole(link.getTargetRole());
         } else {
-            memberRepository.save(new PartyMemberEntity(link.getParty(), user, PartyRoleType.PLAYER, MemberStatusType.ACTIVE));
+            memberRepository.save(new PartyMemberEntity(link.getParty(), user, link.getTargetRole(), MemberStatusType.ACTIVE));
         }
         gameChronicleService.insertPartyMemberIntoActiveRuns(link.getPartyId(), userId);
     }
@@ -101,19 +103,19 @@ public class InvitationService {
     }
 
     /**
-     * Protects simultaneous regeneration/backfill requests for the same party: {@code party_id}
-     * being the primary key makes a second row for one party structurally impossible, and the
-     * pessimistic write lock taken by {@code findForUpdateById} serializes concurrent callers so
-     * the second one always observes the first one's committed row instead of racing to insert
-     * a duplicate.
+     * Protects simultaneous regeneration/backfill requests for the same (party, target role):
+     * {@code UNIQUE(party_id, target_role)} makes a second row for the same pair structurally
+     * impossible, and the pessimistic write lock taken by {@code findForUpdateByPartyIdAndTargetRole}
+     * serializes concurrent callers so the second one always observes the first one's committed
+     * row instead of racing to insert a duplicate.
      */
-    private PartyInvitationLinkEntity getOrCreateForUpdate(final PartyEntity party, final UserEntity actor) {
-        return linkRepository.findForUpdateById(party.getId()).orElseGet(() -> {
+    private PartyInvitationLinkEntity getOrCreateForUpdate(final PartyEntity party, final UserEntity actor, final PartyRoleType targetRole) {
+        return linkRepository.findForUpdateByPartyIdAndTargetRole(party.getId(), targetRole).orElseGet(() -> {
             try {
                 final var rawToken = TokenUtils.randomToken();
-                return linkRepository.saveAndFlush(new PartyInvitationLinkEntity(party, rawToken, TokenUtils.sha256(rawToken), actor));
+                return linkRepository.saveAndFlush(new PartyInvitationLinkEntity(party, targetRole, rawToken, TokenUtils.sha256(rawToken), actor));
             } catch (final DataIntegrityViolationException raceLost) {
-                return linkRepository.findForUpdateById(party.getId()).orElseThrow(() -> raceLost);
+                return linkRepository.findForUpdateByPartyIdAndTargetRole(party.getId(), targetRole).orElseThrow(() -> raceLost);
             }
         });
     }

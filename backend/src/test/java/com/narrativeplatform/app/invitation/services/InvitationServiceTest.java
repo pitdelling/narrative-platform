@@ -32,7 +32,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**
- * Covers the required scenarios for the reusable per-party invitation link.
+ * Covers the required scenarios for the reusable per-(party, target role) invitation link.
  *
  * <p>{@link PartyAccessService} is constructed for real (wired to mocked repositories),
  * not mocked itself, so the authorization tests exercise the actual business rule rather
@@ -40,10 +40,10 @@ import static org.mockito.Mockito.*;
  *
  * <p>Scenario 9 ("concurrent regeneration leaves exactly one active link") is covered here
  * only as the race-handling *mechanism* inside {@code getOrCreateForUpdate} — the true
- * "only one row can ever exist" guarantee is structural (party_id is the primary key) and
- * documented in {@link PartyInvitationLinkEntity} and {@link InvitationService}, not
- * re-proven by a live concurrent-transaction test (no Testcontainers/new dependency, per
- * the project owner's explicit choice).
+ * "only one row per (party, target role) can ever exist" guarantee is structural
+ * (a unique constraint on those two columns) and documented in {@link PartyInvitationLinkEntity}
+ * and {@link InvitationService}, not re-proven by a live concurrent-transaction test
+ * (no Testcontainers/new dependency, per the project owner's explicit choice).
  */
 @ExtendWith(MockitoExtension.class)
 class InvitationServiceTest {
@@ -100,16 +100,12 @@ class InvitationServiceTest {
         return new PartyMemberEntity(party, user, role, status);
     }
 
-    /**
-     * The production constructor deliberately leaves {@code partyId} null so Spring Data JPA's
-     * save() calls persist() instead of merge() (see {@link PartyInvitationLinkEntity}'s
-     * Javadoc) — Hibernate only fills it in via @MapsId once a real EntityManager persists the
-     * row, which never happens in this pure-Mockito test. Set it explicitly here instead.
-     */
     private PartyInvitationLinkEntity link(final String rawToken, final UserEntity actor) {
-        final var entity = new PartyInvitationLinkEntity(party, rawToken, TokenUtils.sha256(rawToken), actor);
-        entity.setPartyId(party.getId());
-        return entity;
+        return link(rawToken, actor, PartyRoleType.PLAYER);
+    }
+
+    private PartyInvitationLinkEntity link(final String rawToken, final UserEntity actor, final PartyRoleType targetRole) {
+        return new PartyInvitationLinkEntity(party, targetRole, rawToken, TokenUtils.sha256(rawToken), actor);
     }
 
     private void currentUserIs(final UserEntity user) {
@@ -123,9 +119,9 @@ class InvitationServiceTest {
         final var membership = membership(owner, PartyRoleType.NARRATOR, MemberStatusType.ACTIVE);
         when(memberRepository.findByPartyIdAndUserId(partyId, owner.getId())).thenReturn(Optional.of(membership));
         final var link = link("raw-token", owner);
-        when(linkRepository.findById(partyId)).thenReturn(Optional.of(link));
+        when(linkRepository.findByPartyIdAndTargetRole(partyId, PartyRoleType.PLAYER)).thenReturn(Optional.of(link));
 
-        final var response = invitationService.getCurrentLink(partyId);
+        final var response = invitationService.getCurrentLink(partyId, PartyRoleType.PLAYER);
 
         assertEquals(partyId, response.partyId());
         assertTrue(response.inviteUrl().endsWith("/invite/raw-token"));
@@ -137,7 +133,7 @@ class InvitationServiceTest {
         final var membership = membership(owner, PartyRoleType.PLAYER, MemberStatusType.ACTIVE);
         when(memberRepository.findByPartyIdAndUserId(partyId, owner.getId())).thenReturn(Optional.of(membership));
 
-        assertThrows(ForbiddenException.class, () -> invitationService.getCurrentLink(partyId));
+        assertThrows(ForbiddenException.class, () -> invitationService.getCurrentLink(partyId, PartyRoleType.PLAYER));
         verifyNoInteractions(linkRepository);
     }
 
@@ -148,9 +144,9 @@ class InvitationServiceTest {
         final var membership = membership(owner, PartyRoleType.NARRATOR, MemberStatusType.ACTIVE);
         when(memberRepository.findByPartyIdAndUserId(partyId, owner.getId())).thenReturn(Optional.of(membership));
         final var link = link("old-token", owner);
-        when(linkRepository.findForUpdateById(partyId)).thenReturn(Optional.of(link));
+        when(linkRepository.findForUpdateByPartyIdAndTargetRole(partyId, PartyRoleType.PLAYER)).thenReturn(Optional.of(link));
 
-        invitationService.regenerateLink(partyId);
+        invitationService.regenerateLink(partyId, PartyRoleType.PLAYER);
 
         assertNotEquals("old-token", link.getToken());
     }
@@ -161,9 +157,9 @@ class InvitationServiceTest {
         final var membership = membership(owner, PartyRoleType.OWNER, MemberStatusType.ACTIVE);
         when(memberRepository.findByPartyIdAndUserId(partyId, owner.getId())).thenReturn(Optional.of(membership));
         final var link = link("old-token", owner);
-        when(linkRepository.findForUpdateById(partyId)).thenReturn(Optional.of(link));
+        when(linkRepository.findForUpdateByPartyIdAndTargetRole(partyId, PartyRoleType.PLAYER)).thenReturn(Optional.of(link));
 
-        assertDoesNotThrow(() -> invitationService.regenerateLink(partyId));
+        assertDoesNotThrow(() -> invitationService.regenerateLink(partyId, PartyRoleType.PLAYER));
     }
 
     // 3. Ordinary member cannot regenerate.
@@ -173,7 +169,7 @@ class InvitationServiceTest {
         final var membership = membership(owner, PartyRoleType.PLAYER, MemberStatusType.ACTIVE);
         when(memberRepository.findByPartyIdAndUserId(partyId, owner.getId())).thenReturn(Optional.of(membership));
 
-        assertThrows(ForbiddenException.class, () -> invitationService.regenerateLink(partyId));
+        assertThrows(ForbiddenException.class, () -> invitationService.regenerateLink(partyId, PartyRoleType.PLAYER));
         verifyNoInteractions(linkRepository);
     }
 
@@ -184,7 +180,7 @@ class InvitationServiceTest {
         final var membership = membership(owner, PartyRoleType.NARRATOR, MemberStatusType.DISABLED);
         when(memberRepository.findByPartyIdAndUserId(partyId, owner.getId())).thenReturn(Optional.of(membership));
 
-        assertThrows(ForbiddenException.class, () -> invitationService.getCurrentLink(partyId));
+        assertThrows(ForbiddenException.class, () -> invitationService.getCurrentLink(partyId, PartyRoleType.PLAYER));
     }
 
     // 5. Removed member cannot retrieve (or regenerate).
@@ -194,7 +190,7 @@ class InvitationServiceTest {
         final var membership = membership(owner, PartyRoleType.NARRATOR, MemberStatusType.REMOVED);
         when(memberRepository.findByPartyIdAndUserId(partyId, owner.getId())).thenReturn(Optional.of(membership));
 
-        assertThrows(ForbiddenException.class, () -> invitationService.getCurrentLink(partyId));
+        assertThrows(ForbiddenException.class, () -> invitationService.getCurrentLink(partyId, PartyRoleType.PLAYER));
     }
 
     // 6. Old link stops working after regeneration.
@@ -206,9 +202,9 @@ class InvitationServiceTest {
         final var oldRawToken = "old-raw-token";
         final var oldHash = TokenUtils.sha256(oldRawToken);
         final var link = link(oldRawToken, owner);
-        when(linkRepository.findForUpdateById(partyId)).thenReturn(Optional.of(link));
+        when(linkRepository.findForUpdateByPartyIdAndTargetRole(partyId, PartyRoleType.PLAYER)).thenReturn(Optional.of(link));
 
-        invitationService.regenerateLink(partyId);
+        invitationService.regenerateLink(partyId, PartyRoleType.PLAYER);
 
         assertNotEquals(oldHash, link.getTokenHash());
 
@@ -267,14 +263,30 @@ class InvitationServiceTest {
         when(memberRepository.findByPartyIdAndUserId(partyId, owner.getId())).thenReturn(Optional.of(membership));
 
         final var wonTheRace = link("concurrent-token", owner);
-        when(linkRepository.findForUpdateById(partyId))
+        when(linkRepository.findForUpdateByPartyIdAndTargetRole(partyId, PartyRoleType.PLAYER))
                 .thenReturn(Optional.empty(), Optional.of(wonTheRace));
         when(linkRepository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("duplicate key"));
 
-        assertDoesNotThrow(() -> invitationService.regenerateLink(partyId));
+        assertDoesNotThrow(() -> invitationService.regenerateLink(partyId, PartyRoleType.PLAYER));
 
         assertNotEquals("concurrent-token", wonTheRace.getToken());
         verify(linkRepository, times(1)).saveAndFlush(any());
-        verify(linkRepository, times(2)).findForUpdateById(partyId);
+        verify(linkRepository, times(2)).findForUpdateByPartyIdAndTargetRole(partyId, PartyRoleType.PLAYER);
+    }
+
+    // 10. Accepting a SPECTATOR-target link assigns the SPECTATOR role, not PLAYER.
+    @Test
+    void acceptingASpectatorLinkAssignsSpectatorRole() {
+        final var rawToken = "spectator-token";
+        final var link = link(rawToken, owner, PartyRoleType.SPECTATOR);
+        when(linkRepository.findByTokenHash(TokenUtils.sha256(rawToken))).thenReturn(Optional.of(link));
+
+        final var newcomer = user("watcher", "Watcher");
+        when(userRepository.findById(newcomer.getId())).thenReturn(Optional.of(newcomer));
+        when(memberRepository.findByPartyIdAndUserId(partyId, newcomer.getId())).thenReturn(Optional.empty());
+
+        invitationService.acceptForUser(rawToken, newcomer.getId());
+
+        verify(memberRepository).save(argThat(m -> m.getRole() == PartyRoleType.SPECTATOR));
     }
 }

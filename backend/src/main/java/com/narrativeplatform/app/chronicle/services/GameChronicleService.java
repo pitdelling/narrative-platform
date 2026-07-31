@@ -11,6 +11,7 @@ import com.narrativeplatform.app.chronicle.models.requests.*;
 import com.narrativeplatform.app.chronicle.models.responses.*;
 import com.narrativeplatform.app.chronicle.repositories.*;
 import com.narrativeplatform.app.party.models.enums.MemberStatusType;
+import com.narrativeplatform.app.party.models.enums.PartyRoleType;
 import com.narrativeplatform.app.party.repositories.PartyMemberRepository;
 import com.narrativeplatform.app.party.services.PartyAccessService;
 import com.narrativeplatform.configuration.AppProperties;
@@ -59,8 +60,11 @@ public class GameChronicleService {
     @Transactional
     public UUID create(final UUID partyId, final CreateGameChronicleRequest request) {
         final var creatorMembership = partyAccessService.requireActiveMember(partyId);
-        final var activeMemberships = partyMemberRepository.findAllByPartyIdAndStatusOrderByJoinedAtAsc(
-                partyId, MemberStatusType.ACTIVE
+        if (creatorMembership.getRole() == PartyRoleType.SPECTATOR) {
+            throw new BadRequestException("A spectator cannot create a game chronicle.");
+        }
+        final var activeMemberships = partyMemberRepository.findAllByPartyIdAndStatusAndRoleNotOrderByJoinedAtAsc(
+                partyId, MemberStatusType.ACTIVE, PartyRoleType.SPECTATOR
         );
         if (activeMemberships.size() < 2) {
             throw new BadRequestException("A game chronicle requires at least two active members.");
@@ -419,6 +423,9 @@ public class GameChronicleService {
     }
 
     private void insertIntoRun(final ChronicleEntity chronicle, final UserEntity user) {
+        final var membership = partyMemberRepository.findByPartyIdAndUserId(chronicle.getParty().getId(), user.getId()).orElse(null);
+        if (membership == null || membership.getRole() == PartyRoleType.SPECTATOR) return;
+
         final var run = gameRunRepository.findForUpdateByChronicleId(chronicle.getId()).orElse(null);
         if (run == null || run.getStatus() != GameRunStatusType.IN_PROGRESS) return;
 

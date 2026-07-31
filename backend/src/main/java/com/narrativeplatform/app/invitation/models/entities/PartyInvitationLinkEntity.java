@@ -5,6 +5,7 @@ import com.narrativeplatform.app.invitation.models.responses.PartyInvitationLink
 
 import com.narrativeplatform.app.auth.models.entities.UserEntity;
 import com.narrativeplatform.app.party.models.entities.PartyEntity;
+import com.narrativeplatform.app.party.models.enums.PartyRoleType;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -13,9 +14,10 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * One reusable, multi-use invitation link per party. `party_id` is the primary key
- * (a "PK = FK" 1:1 extension table, matching {@code written_story_documents}/{@code game_drafts}),
- * which structurally guarantees at most one row per party.
+ * One reusable, multi-use invitation link per (party, target role). A party has one link that
+ * registers new members as {@code PLAYER} and a separate one that registers them directly as
+ * {@code SPECTATOR}, enforced by {@code UNIQUE(party_id, target_role)} rather than the single-row-
+ * per-party {@code party_id} primary key this table used before spectator invites existed.
  *
  * <p>Security trade-off: unlike the retired one-use invite (hash-only, shown once at creation),
  * this link must be redisplayed on demand to any authorized viewer, so the raw {@code token} is
@@ -31,17 +33,20 @@ import java.util.UUID;
 @ToString
 @NoArgsConstructor
 @Entity
-@Table(name = "party_invitation_links")
+@Table(name = "party_invitation_links", uniqueConstraints = @UniqueConstraint(columnNames = {"party_id", "target_role"}))
 public class PartyInvitationLinkEntity {
     @Id
-    @Column(name = "party_id")
-    private UUID partyId;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
 
-    @OneToOne(fetch = FetchType.LAZY)
-    @MapsId
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "party_id")
     @ToString.Exclude
     private PartyEntity party;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "target_role", nullable = false, length = 30)
+    private PartyRoleType targetRole;
 
     @Column(nullable = false, unique = true, length = 64)
     @ToString.Exclude
@@ -65,21 +70,21 @@ public class PartyInvitationLinkEntity {
 
     public PartyInvitationLinkEntity(
             final PartyEntity party,
+            final PartyRoleType targetRole,
             final String token,
             final String tokenHash,
             final UserEntity createdBy
     ) {
-        // Do not set `partyId` explicitly here: Spring Data JPA's save() decides persist vs.
-        // merge based on whether the id is already non-null. Presetting it makes save() treat a
-        // brand-new entity as a detached one and call merge(), which crashes on this @MapsId
-        // one-to-one with a Hibernate "null identifier" AssertionFailure. Leaving it null lets
-        // save() correctly call persist(), and Hibernate derives partyId from `party` at flush
-        // time (same convention as GameDraftEntity/WrittenStoryDocumentEntity).
         this.party = party;
+        this.targetRole = targetRole;
         this.token = token;
         this.tokenHash = tokenHash;
         this.createdBy = createdBy;
         this.rotatedAt = Instant.now();
+    }
+
+    public UUID getPartyId() {
+        return party.getId();
     }
 
     public void rotate(final String token, final String tokenHash, final UserEntity actor) {
@@ -90,10 +95,10 @@ public class PartyInvitationLinkEntity {
     }
 
     public PartyInvitationLinkResponse toResponse(final String inviteUrl) {
-        return new PartyInvitationLinkResponse(partyId, inviteUrl);
+        return new PartyInvitationLinkResponse(getPartyId(), inviteUrl);
     }
 
     public InvitePreviewResponse toPreviewResponse() {
-        return new InvitePreviewResponse(partyId, party.getName(), createdBy.getDisplayName());
+        return new InvitePreviewResponse(getPartyId(), party.getName(), createdBy.getDisplayName(), targetRole);
     }
 }
