@@ -11,4 +11,5 @@ public final class DomainConstants {
     public static final int MAX_SEGMENT_LENGTH = 10_000;
     public static final int MAX_WRITTEN_STORY_LENGTH = 100_000;
     public static final String USERNAME_PATTERN = "^[a-zA-Z0-9_-]+$";
+    public static final int STORY_VOTE_DAILY_LIMIT = 2;
 }

@@ -7,7 +7,7 @@ import java.util.UUID;
 
 public record ChronicleCardResponse(
         UUID id, ChronicleType type, ChronicleStatusType status, String title, String preview, String creatorName,
-        Instant createdAt, Instant updatedAt, boolean published, Integer completedTurns, Integer totalTurns,
-        Boolean awaitingCurrentUser
+        Instant createdAt, Instant updatedAt, Instant publishedAt, boolean published, Integer completedTurns,
+        Integer totalTurns, Boolean awaitingCurrentUser
 ) {
 }

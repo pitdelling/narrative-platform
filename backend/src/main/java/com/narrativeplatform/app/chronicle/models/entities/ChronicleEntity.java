@@ -83,7 +83,7 @@ public class ChronicleEntity {
     public ChronicleCardResponse toCardResponse(final Integer completedTurns, final Integer totalTurns, final Boolean awaitingCurrentUser) {
         final var preview = status == ChronicleStatusType.PUBLISHED && synopsis != null ? synopsis : generatedPreview;
         return new ChronicleCardResponse(
-                id, type, status, title, preview, creator.getDisplayName(), createdAt, updatedAt,
+                id, type, status, title, preview, creator.getDisplayName(), createdAt, updatedAt, publishedAt,
                 status == ChronicleStatusType.PUBLISHED, completedTurns, totalTurns, awaitingCurrentUser
         );
     }
