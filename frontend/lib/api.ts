@@ -4,6 +4,14 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080/api";
 
 const translatedProblemMessages: Record<string, string> = {
   ai_not_configured: "A geração por IA ainda não está configurada.",
+  // These 4 codes are exclusive to the story-vote endpoints (no other endpoint reuses them),
+  // so they are safe to translate globally. Generic codes like `forbidden`/`not_found` are
+  // reused across the whole app and must be given context-specific messages at the call site
+  // instead, never overridden here.
+  story_vote_budget_exceeded: "Você já usou os 2 votos disponíveis hoje.",
+  story_not_completed: "Esta história não está disponível para votação.",
+  invalid_story_vote_units: "Não foi possível atualizar seu voto. Recarregue a página e tente novamente.",
+  story_vote_concurrency_conflict: "Os votos foram atualizados por outra ação. Recarregamos o estado atual.",
 };
 
 export class ApiError extends Error {

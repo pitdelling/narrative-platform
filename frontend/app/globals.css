@@ -17,6 +17,7 @@
   --violet-rgb: 118,101,167;
   --violet-strong: #57477f;
   --green: #627a66;
+  --green-rgb: 98,122,102;
   --danger: #9a4f47;
   --danger-rgb: 154,79,71;
   --azure: #3d6fa5;
@@ -68,6 +69,7 @@
   --violet-rgb: 156,139,216;
   --violet-strong: #d2c9f2;
   --green: #82bd92;
+  --green-rgb: 130,189,146;
   --danger: #e0827b;
   --danger-rgb: 224,130,123;
   --azure: #7aa8dd;
@@ -254,9 +256,13 @@ textarea { resize: vertical; line-height: 1.65; }
 .checkbox { display: flex; align-items: center; gap: .5rem; font-weight: 400; }
 .checkbox input { width: auto; }
 .chronicle-grid { display: grid; gap: .8rem; }
-.chronicle-card { height: 205px; min-height: 205px; display: grid; grid-template-columns: 170px 1fr; overflow: hidden; transition: 160ms ease; }
+.chronicle-card { position: relative; height: 205px; min-height: 205px; transition: 160ms ease; }
 .chronicle-card:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(var(--shadow-rgb),.12); }
 .chronicle-card.featured { border-color: rgba(var(--gold-rgb),.65); }
+/* Overflow lives here, not on .chronicle-card itself, so the floating badge/vote-control
+   (positioned outside .chronicle-card's box, same trick as .story-modal .modal-close) never
+   gets clipped — same fix already applied once to .story-modal/.story-modal-scroll. */
+.chronicle-card-inner { display: grid; grid-template-columns: 170px 1fr; height: 100%; overflow: hidden; border-radius: inherit; }
 .chronicle-art { display: grid; place-items: center; min-height: 205px; color: var(--gold); font-size: 2rem; background-color: var(--navy); background-image: radial-gradient(circle, transparent 0 25%, rgba(var(--gold-rgb),.28) 26% 27%, transparent 28%), repeating-radial-gradient(circle, transparent 0 14px, rgba(var(--gold-rgb),.16) 15px 16px); }
 .art-1 { color: var(--navy); background-color: #eee2ca; }
 .art-2 { color: var(--green); background-color: #dbe2dc; }
@@ -270,6 +276,27 @@ textarea { resize: vertical; line-height: 1.65; }
 .ai-processing-timer { display: inline-flex; align-items: center; height: fit-content; padding: .32rem .65rem; border-radius: 999px; color: var(--copper); background: rgba(var(--parchment-rgb),.7); font-size: .72rem; white-space: nowrap; }
 .status-published { color: var(--violet-strong); background: rgba(var(--violet-rgb),.13); }
 .status-in_progress, .status-ai_pending, .status-ai_processing { color: var(--copper); }
+
+/* Story votes: banner above the grid, section dividers, ranking badges, and the floating vote control. */
+.story-votes-banner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem 1rem; margin-bottom: .9rem; }
+.story-votes-budget { display: inline-flex; align-items: center; gap: .5rem; padding: .5rem .95rem; color: var(--heading); font-weight: 700; font-size: .85rem; background: rgba(var(--gold-rgb),.14); border: 1px solid rgba(var(--gold-rgb),.4); border-radius: 999px; }
+.story-votes-budget-icon { color: var(--gold); }
+.sort-select-label { display: flex; align-items: center; gap: .5rem; color: var(--heading); font-weight: 600; font-size: .85rem; }
+.sort-select { width: auto; padding: .45rem .6rem; font-size: .85rem; }
+.celestial-divider.full-width { width: 100%; margin: 1.6rem 0; }
+
+/* Rotated -45deg so the medallion reads upright-ish while still looking pinned to the corner. */
+.rank-badge { position: absolute; top: -14px; left: -14px; width: 56px; height: 56px; transform: rotate(-45deg); z-index: 2; filter: drop-shadow(0 4px 10px rgba(var(--shadow-rgb),.35)); pointer-events: none; }
+
+.story-vote-control { position: absolute; top: -14px; right: -14px; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: .3rem .3rem; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow); }
+.story-vote-count { min-width: 1.4rem; text-align: center; color: var(--heading); font-weight: 700; font-size: .78rem; }
+.story-vote-button { display: grid; place-items: center; width: 26px; height: 22px; padding: 0; background: transparent; border: none; border-radius: 999px; font-size: .68rem; line-height: 1; }
+.story-vote-up { color: var(--green); }
+.story-vote-up:hover:not(:disabled) { background: rgba(var(--green-rgb),.18); }
+.story-vote-down { color: var(--danger); }
+.story-vote-down:hover:not(:disabled) { background: rgba(var(--danger-rgb),.18); }
+.story-vote-button:disabled { opacity: .35; cursor: not-allowed; }
+
 .empty-state { padding: 4rem; text-align: center; }
 .empty-state span { color: var(--gold); font-size: 2rem; }
 .generated-story { padding: 2rem clamp(1.3rem, 4vw, 4rem); margin-bottom: 2.3rem; }
@@ -545,18 +572,23 @@ textarea { resize: vertical; line-height: 1.65; }
   .sidebar nav { display: flex; overflow-x: auto; margin: 1.2rem 0 0; }
   .sidebar blockquote, .sidebar > button { display: none; }
   .page-header { flex-direction: column; }
-  .chronicle-card { height: auto; min-height: 165px; grid-template-columns: 100px 1fr; }
+  .chronicle-card { height: auto; min-height: 165px; }
+  .chronicle-card-inner { grid-template-columns: 100px 1fr; }
   .chronicle-art { min-height: 100%; }
 }
 @media (max-width: 600px) {
   .main-content { padding: 1.4rem 1rem; }
   .brand-mark small { display: none; }
   .page-header h1 { font-size: 2.7rem; }
-  .chronicle-card { height: auto; grid-template-columns: 1fr; }
+  .chronicle-card { height: auto; }
+  .chronicle-card-inner { grid-template-columns: 1fr; }
   .chronicle-art { min-height: 90px; }
   .card-heading, .thread-meta { flex-direction: column; }
   .notice > div, .inline-form { flex-direction: column; }
   .auth-page { padding: 1rem; }
+  .rank-badge { width: 44px; height: 44px; top: -10px; left: -10px; }
+  .story-vote-control { top: -10px; right: -10px; }
+  .story-votes-banner { flex-direction: column; align-items: flex-start; }
 }
 
 .members-panel { margin: 1rem 0 1.5rem; padding: 1.2rem; }

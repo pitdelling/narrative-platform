@@ -2,14 +2,20 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { api } from "@/lib/api";
-import type { ChronicleCard, PartyDetail, PartyInvitationLink, PartyMember, PartyRole } from "@/lib/types";
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
+import { api, ApiError } from "@/lib/api";
+import type {
+  ChronicleCard, DailyStoryVoteState, PartyDetail, PartyInvitationLink, PartyMember, PartyRole,
+  SortMode, StoryVoteSummary,
+} from "@/lib/types";
 import { AppShell } from "@/components/AppShell";
 import { AiTagSettingsPanel } from "@/components/chronicle/AiTagSettingsPanel";
 import { GameProgressBar } from "@/components/chronicle/GameProgressBar";
+import { RankBadge } from "@/components/chronicle/RankBadge";
+import { StoryVoteControl } from "@/components/chronicle/StoryVoteControl";
 import { WhatsAppIcon } from "@/components/WhatsAppIcon";
 import { isContentEmpty, RichTextEditor } from "@/components/RichTextEditor";
+import { dailyBudgetMessage, sortPublishedChronicles, splitRankedChronicles, submitVote } from "@/lib/storyVotes";
 
 const roleLabels: Record<PartyRole, string> = {
   OWNER: "Proprietário",
@@ -24,21 +30,24 @@ const statusLabels: Record<PartyMember["status"], string> = {
   REMOVED: "Removido",
 };
 
-function compareChronicles(a: ChronicleCard, b: ChronicleCard): number {
-  if (a.published !== b.published) return a.published ? 1 : -1;
-  if (!a.published) {
-    const awaitingDiff = Number(b.awaitingCurrentUser ?? false) - Number(a.awaitingCurrentUser ?? false);
-    if (awaitingDiff !== 0) return awaitingDiff;
-    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-  }
-  return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+function compareInProgressChronicles(a: ChronicleCard, b: ChronicleCard): number {
+  const awaitingDiff = Number(b.awaitingCurrentUser ?? false) - Number(a.awaitingCurrentUser ?? false);
+  if (awaitingDiff !== 0) return awaitingDiff;
+  return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
 }
 
 export default function PartyArchivePage() {
   const { partyId } = useParams<{ partyId: string }>();
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [party, setParty] = useState<PartyDetail>();
   const [chronicles, setChronicles] = useState<ChronicleCard[]>([]);
+  const [voteSummary, setVoteSummary] = useState<StoryVoteSummary[]>([]);
+  const [dailyVoteState, setDailyVoteState] = useState<DailyStoryVoteState>();
+  const [votesError, setVotesError] = useState("");
+  const [voteActionError, setVoteActionError] = useState("");
+  const [pendingVoteChronicleId, setPendingVoteChronicleId] = useState<string>();
   const [showCreate, setShowCreate] = useState(false);
   const [kind, setKind] = useState<"GAME" | "WRITTEN">("GAME");
   const [title, setTitle] = useState("");
@@ -56,7 +65,54 @@ export default function PartyArchivePage() {
   const [message, setMessage] = useState("");
   const narrator = party?.currentUserRole === "OWNER" || party?.currentUserRole === "NARRATOR";
   const owner = party?.currentUserRole === "OWNER";
-  const sortedChronicles = useMemo(() => [...chronicles].sort(compareChronicles), [chronicles]);
+
+  const sortParam = searchParams.get("sort");
+  const sortMode: SortMode = sortParam === "NEWEST" || sortParam === "OLDEST" ? sortParam : "RANK";
+
+  const voteSummaryById = useMemo(() => new Map(voteSummary.map((entry) => [entry.chronicleId, entry])), [voteSummary]);
+
+  const inProgressChronicles = useMemo(
+    () => chronicles.filter((item) => !item.published).sort(compareInProgressChronicles),
+    [chronicles]
+  );
+
+  // Only the Ranking mode splits published stories into a "podium" (rank 1-5) and a
+  // "concluded" block with a divider between them — Newest/Oldest keep a single flat list,
+  // exactly like before.
+  const rankedSections = useMemo(() => {
+    const published = chronicles.filter((item) => item.published);
+    if (sortMode === "RANK") {
+      return splitRankedChronicles(published, voteSummaryById);
+    }
+    return { podium: [] as ChronicleCard[], concluded: sortPublishedChronicles(published, voteSummaryById, sortMode) };
+  }, [chronicles, voteSummaryById, sortMode]);
+
+  function changeSortMode(next: SortMode) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (next === "RANK") {
+      params.delete("sort");
+    } else {
+      params.set("sort", next);
+    }
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname);
+  }
+
+  const loadVotes = useCallback(async () => {
+    try {
+      const [summary, daily] = await Promise.all([
+        api<StoryVoteSummary[]>(`/parties/${partyId}/story-votes/summary`),
+        api<DailyStoryVoteState>(`/parties/${partyId}/story-votes/today`),
+      ]);
+      setVoteSummary(summary);
+      setDailyVoteState(daily);
+      setVotesError("");
+    } catch (cause) {
+      setVoteSummary([]);
+      setDailyVoteState(undefined);
+      setVotesError(cause instanceof Error ? cause.message : "Não foi possível carregar os votos.");
+    }
+  }, [partyId]);
 
   const load = useCallback(async () => {
     const [partyDetail, chronicleCards] = await Promise.all([
@@ -69,7 +125,8 @@ export default function PartyArchivePage() {
       setInvitation(await api<PartyInvitationLink>(`/parties/${partyId}/invitation`));
       setSpectatorInvitation(await api<PartyInvitationLink>(`/parties/${partyId}/invitation/spectator`));
     }
-  }, [partyId]);
+    await loadVotes();
+  }, [partyId, loadVotes]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -77,6 +134,29 @@ export default function PartyArchivePage() {
     }, 0);
     return () => window.clearTimeout(timeoutId);
   }, [load]);
+
+  async function handleVoteChange(chronicleId: string, storyTitle: string, nextUnits: number) {
+    setVoteActionError("");
+    setPendingVoteChronicleId(chronicleId);
+    try {
+      const updated = await submitVote(partyId, chronicleId, nextUnits);
+      setDailyVoteState(updated);
+      await loadVotes();
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.code === "forbidden") {
+        setVoteActionError("Você não pode votar nesta party.");
+      } else if (cause instanceof ApiError && cause.code === "not_found") {
+        setVoteActionError("Esta história não está mais disponível.");
+      } else if (cause instanceof ApiError && cause.code === "story_vote_concurrency_conflict") {
+        setVoteActionError(cause.message);
+        await loadVotes();
+      } else {
+        setVoteActionError(cause instanceof Error ? cause.message : `Não foi possível atualizar seu voto em "${storyTitle}". Tente novamente.`);
+      }
+    } finally {
+      setPendingVoteChronicleId(undefined);
+    }
+  }
 
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -184,6 +264,48 @@ export default function PartyArchivePage() {
     if (!confirmed) return;
     await api(`/parties/${partyId}/members/${member.userId}`, { method: "DELETE" });
     await load();
+  }
+
+  function renderChronicleCard(item: ChronicleCard, index: number) {
+    const hasProgress = item.type === "GAME" && item.status === "IN_PROGRESS" && typeof item.totalTurns === "number";
+    const summary = item.published ? voteSummaryById.get(item.id) : undefined;
+    return (
+      <Link
+        href={`/app/party/${partyId}/chronicle/${item.id}?type=${item.type}`}
+        key={item.id}
+        className={`chronicle-card card ${index === 0 ? "featured" : ""} ${item.status !== "PUBLISHED" ? "building" : ""}`}
+      >
+        {summary && <RankBadge rank={summary.rank} />}
+        {summary && (
+          <StoryVoteControl
+            storyTitle={item.title}
+            unitsToday={summary.currentUserVotesToday}
+            totalVotes={summary.totalVotes}
+            remainingUnitsToday={dailyVoteState?.remainingUnits ?? 0}
+            canVote={summary.canVote}
+            disabled={pendingVoteChronicleId === item.id}
+            onChange={(nextUnits) => void handleVoteChange(item.id, item.title, nextUnits)}
+          />
+        )}
+        <div className="chronicle-card-inner">
+          <div className={`chronicle-art art-${index % 4}`}><span>{item.status === "PUBLISHED" ? "✦" : "◌"}</span></div>
+          <div className="chronicle-copy">
+            {hasProgress && (
+              <div className="card-progress-row">
+                <GameProgressBar completed={item.completedTurns ?? 0} total={item.totalTurns as number} />
+                <span className={`status-pill status-${item.status.toLowerCase()}`}>{item.status.replaceAll("_", " ")}</span>
+              </div>
+            )}
+            <div className="card-heading">
+              <h2>{item.title}</h2>
+              {!hasProgress && <span className={`status-pill status-${item.status.toLowerCase()}`}>{item.status.replaceAll("_", " ")}</span>}
+            </div>
+            <p>{item.preview || (item.status === "IN_PROGRESS" ? "Uma história ainda está sendo construída. Os trechos permanecem velados." : "Este registro ainda não possui uma versão publicada.")}</p>
+            <small>Criado por {item.creatorName}</small>
+          </div>
+        </div>
+      </Link>
+    );
   }
 
   return (
@@ -390,41 +512,69 @@ export default function PartyArchivePage() {
         </form>
       )}
 
-      <section className="chronicle-grid">
-        {sortedChronicles.map((item, index) => {
-          const hasProgress = item.type === "GAME" && item.status === "IN_PROGRESS" && typeof item.totalTurns === "number";
-          return (
-          <Link
-            href={`/app/party/${partyId}/chronicle/${item.id}?type=${item.type}`}
-            key={item.id}
-            className={`chronicle-card card ${index === 0 ? "featured" : ""} ${item.status !== "PUBLISHED" ? "building" : ""}`}
-          >
-            <div className={`chronicle-art art-${index % 4}`}><span>{item.status === "PUBLISHED" ? "✦" : "◌"}</span></div>
-            <div className="chronicle-copy">
-              {hasProgress && (
-                <div className="card-progress-row">
-                  <GameProgressBar completed={item.completedTurns ?? 0} total={item.totalTurns as number} />
-                  <span className={`status-pill status-${item.status.toLowerCase()}`}>{item.status.replaceAll("_", " ")}</span>
-                </div>
-              )}
-              <div className="card-heading">
-                <h2>{item.title}</h2>
-                {!hasProgress && <span className={`status-pill status-${item.status.toLowerCase()}`}>{item.status.replaceAll("_", " ")}</span>}
-              </div>
-              <p>{item.preview || (item.status === "IN_PROGRESS" ? "Uma história ainda está sendo construída. Os trechos permanecem velados." : "Este registro ainda não possui uma versão publicada.")}</p>
-              <small>Criado por {item.creatorName}</small>
-            </div>
-          </Link>
-          );
-        })}
-        {chronicles.length === 0 && (
-          <div className="empty-state card">
-            <span>✦</span>
-            <h2>Ainda não há registros neste arquivo.</h2>
-            <p>Comece escrevendo a primeira crônica.</p>
-          </div>
+      <div className="story-votes-banner">
+        {dailyVoteState && (
+          <span className="story-votes-budget">
+            <span className="story-votes-budget-icon" aria-hidden="true">✦</span>
+            {dailyBudgetMessage(dailyVoteState)}
+          </span>
         )}
-      </section>
+        {votesError && <span className="error-message">Não foi possível carregar os votos.</span>}
+        <label className="sort-select-label">
+          Ordenar por
+          <select className="sort-select" value={sortMode} onChange={(event) => changeSortMode(event.target.value as SortMode)}>
+            <option value="RANK">Ranking</option>
+            <option value="NEWEST">Mais recentes</option>
+            <option value="OLDEST">Mais antigas</option>
+          </select>
+        </label>
+      </div>
+      {voteActionError && <p className="error-message">{voteActionError}</p>}
+
+      {sortMode === "RANK" ? (
+        <>
+          <section className="chronicle-grid">
+            {inProgressChronicles.map((item, index) => renderChronicleCard(item, index))}
+            {chronicles.length === 0 && (
+              <div className="empty-state card">
+                <span>✦</span>
+                <h2>Ainda não há registros neste arquivo.</h2>
+                <p>Comece escrevendo a primeira crônica.</p>
+              </div>
+            )}
+          </section>
+          {rankedSections.podium.length > 0 && (
+            <>
+              <div className="celestial-divider full-width" aria-hidden="true">✦</div>
+              <section className="chronicle-grid">
+                {rankedSections.podium.map((item, index) => renderChronicleCard(item, index))}
+              </section>
+            </>
+          )}
+          {rankedSections.concluded.length > 0 && (
+            <>
+              <div className="celestial-divider full-width" aria-hidden="true">✦</div>
+              <section className="chronicle-grid">
+                {rankedSections.concluded.map((item, index) => renderChronicleCard(item, index))}
+              </section>
+            </>
+          )}
+        </>
+      ) : (
+        // No section dividers in this mode, so pending and concluded stories share a single
+        // grid container — two separate <section> grids would have no gap between them (CSS
+        // `gap` only spaces items within the same grid, not between sibling grids).
+        <section className="chronicle-grid">
+          {[...inProgressChronicles, ...rankedSections.concluded].map((item, index) => renderChronicleCard(item, index))}
+          {chronicles.length === 0 && (
+            <div className="empty-state card">
+              <span>✦</span>
+              <h2>Ainda não há registros neste arquivo.</h2>
+              <p>Comece escrevendo a primeira crônica.</p>
+            </div>
+          )}
+        </section>
+      )}
     </AppShell>
   );
 }

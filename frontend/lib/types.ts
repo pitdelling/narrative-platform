@@ -99,10 +99,36 @@ export interface ChronicleCard {
   creatorName: string;
   createdAt: string;
   updatedAt: string;
+  publishedAt?: string;
   published: boolean;
   completedTurns?: number;
   totalTurns?: number;
   awaitingCurrentUser?: boolean;
+}
+
+export type SortMode = "RANK" | "NEWEST" | "OLDEST";
+
+export interface StoryVoteSummary {
+  chronicleId: string;
+  totalVotes: number;
+  rank?: number;
+  currentUserVotesToday: number;
+  currentUserRemainingVotesToday: number;
+  canVote: boolean;
+  reason?: string;
+}
+
+export interface StoryVoteAllocation {
+  chronicleId: string;
+  units: number;
+}
+
+export interface DailyStoryVoteState {
+  dateUtc: string;
+  dailyLimit: number;
+  usedUnits: number;
+  remainingUnits: number;
+  allocations: StoryVoteAllocation[];
 }
 
 export interface Turn {
