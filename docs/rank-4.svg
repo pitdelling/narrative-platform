@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">4º lugar</title>
+  <desc id="desc">Badge de ranking em estilo rabiscado, posição 4</desc>
+  <defs>
+    <filter id="rough" x="-20%" y="-20%" width="140%" height="140%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.018 0.09" numOctaves="2" seed="21" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="2.6" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="metal" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#AAB7C0"/>
+      <stop offset="0.45" stop-color="#687A88"/>
+      <stop offset="1" stop-color="#3E4A54"/>
+    </linearGradient>
+    <radialGradient id="inner" cx="45%" cy="35%" r="75%">
+      <stop offset="0" stop-color="#252525"/>
+      <stop offset="0.6" stop-color="#111111"/>
+      <stop offset="1" stop-color="#050505"/>
+    </radialGradient>
+  </defs>
+
+  <!-- muted glow behind the badge -->
+  <path d="M128 20 L157 43 L192 43 L197 77 L226 96 L211 128 L226 160 L197 179 L192 213 L157 213 L128 236 L99 213 L64 213 L59 179 L30 160 L45 128 L30 96 L59 77 L64 43 L99 43 Z"
+        fill="#687A88" opacity="0.22" filter="url(#glow)"/>
+
+  <!-- thorny hand-drawn silhouette -->
+  <polygon points="128,10 143,35 162,19 169,47 194,32 190,61 221,57 204,82 238,94 210,108 246,130 211,141 236,164 204,170 217,199 187,194 181,226 158,207 145,242 128,216 109,244 99,210 73,229 70,198 39,203 52,174 20,164 46,142 10,128 46,111 19,91 51,82 36,54 68,59 75,28 101,46" fill="#080808" stroke="#3E4A54" stroke-width="8" stroke-linejoin="round" filter="url(#rough)"/>
+  <polygon points="128,10 143,35 162,19 169,47 194,32 190,61 221,57 204,82 238,94 210,108 246,130 211,141 236,164 204,170 217,199 187,194 181,226 158,207 145,242 128,216 109,244 99,210 73,229 70,198 39,203 52,174 20,164 46,142 10,128 46,111 19,91 51,82 36,54 68,59 75,28 101,46" fill="none" stroke="#687A88" stroke-width="3.5" stroke-linejoin="round" opacity="0.78" filter="url(#rough)"/>
+
+  <!-- shield -->
+  <path d="M128 36 C158 36 183 49 197 63 L190 151 C187 186 160 207 128 221 C96 207 69 186 66 151 L59 63 C73 49 98 36 128 36 Z" fill="url(#metal)" stroke="#090909" stroke-width="7" stroke-linejoin="round" filter="url(#rough)"/>
+  <path d="M128 36 C158 36 183 49 197 63 L190 151 C187 186 160 207 128 221 C96 207 69 186 66 151 L59 63 C73 49 98 36 128 36 Z" fill="none" stroke="#AAB7C0" stroke-width="2.4" opacity="0.82" filter="url(#rough)"/>
+  <path d="M128 51 C153 51 174 61 184 71 L178 149 C175 176 154 194 128 206 C102 194 81 176 78 149 L72 71 C82 61 103 51 128 51 Z" fill="url(#inner)" stroke="#000" stroke-width="5" filter="url(#rough)"/>
+  <path d="M128 51 C153 51 174 61 184 71 L178 149 C175 176 154 194 128 206 C102 194 81 176 78 149 L72 71 C82 61 103 51 128 51 Z" fill="none" stroke="#687A88" stroke-width="2.5" opacity="0.72" filter="url(#rough)"/>
+
+  <!-- scratches -->
+  <g fill="none" stroke="#AAB7C0" stroke-width="2.2" stroke-linecap="square" opacity="0.72" filter="url(#rough)">
+    <path d="M76 77 L91 68" />
+<path d="M82 87 L98 73" />
+<path d="M165 73 L180 83" />
+<path d="M161 64 L177 75" />
+<path d="M76 165 L91 179" />
+<path d="M83 175 L101 189" />
+<path d="M161 187 L180 171" />
+<path d="M168 178 L183 164" />
+<path d="M110 47 L116 38" />
+<path d="M141 46 L146 37" />
+<path d="M109 214 L116 224" />
+<path d="M142 214 L149 223" />
+  </g>
+
+  <!-- rank -->
+  <g filter="url(#rough)">
+    <text x="123" y="157" text-anchor="middle" fill="#687A88" stroke="#000" stroke-width="7" paint-order="stroke fill"
+          font-family="Impact, Haettenschweiler, 'Arial Black', sans-serif" font-size="104" font-weight="900">4</text>
+    <text x="168" y="100" text-anchor="middle" fill="#AAB7C0" stroke="#000" stroke-width="4" paint-order="stroke fill"
+          font-family="Impact, Haettenschweiler, 'Arial Black', sans-serif" font-size="38" font-weight="900">º</text>
+    <text x="128" y="185" text-anchor="middle" fill="#ECECEC" opacity="0.92"
+          font-family="Arial, sans-serif" font-size="13" font-weight="800" letter-spacing="3">LUGAR</text>
+  </g>
+
+  <!-- sketchy highlights -->
+  <g fill="none" stroke="#F8F8F8" stroke-width="1.6" opacity="0.55" filter="url(#rough)">
+    <path d="M84 59 C98 47 111 44 125 44"/>
+    <path d="M77 70 C89 58 99 55 111 52"/>
+    <path d="M171 60 C180 68 186 80 189 94"/>
+    <path d="M72 145 C74 166 83 181 98 192"/>
+    <path d="M181 145 C178 164 170 179 156 190"/>
+  </g>
+</svg>
